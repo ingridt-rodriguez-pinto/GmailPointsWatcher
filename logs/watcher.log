@@ -235,3 +235,38 @@
 2025-12-10 13:41:42,225 INFO Application is stopping. This might take a moment.
 2025-12-10 13:41:42,225 INFO Scheduler has been shut down
 2025-12-10 13:41:42,236 INFO Application.stop() complete
+2025-12-10 14:28:57,154 WARNING ⚠️ Usando CHAT_ID por defecto (1943663667).
+2025-12-10 14:28:57,158 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-12-10 14:28:57,760 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getMe "HTTP/1.1 200 OK"
+2025-12-10 14:28:57,917 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/deleteWebhook "HTTP/1.1 200 OK"
+2025-12-10 14:28:57,919 INFO Added job "_email_job" to job store "default"
+2025-12-10 14:28:57,919 INFO Scheduler started
+2025-12-10 14:28:57,920 INFO Application started
+2025-12-10 14:29:08,387 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:29:08,781 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:29:08,782 INFO Comando /start recibido del CHAT_ID: 1943663667
+2025-12-10 14:29:09,364 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 14:29:16,888 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:29:17,471 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-12-10 14:29:17,753 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 14:29:20,155 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:29:20,429 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-12-10 14:29:20,715 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 14:29:23,179 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:29:23,453 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-12-10 14:29:23,747 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 14:29:33,337 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:29:43,493 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:29:45,058 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:29:53,156 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:29:53,842 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-12-10 14:29:54,125 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 14:29:57,164 INFO Running job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 19:30:57 UTC)" (scheduled at 2025-12-10 19:29:57.158057+00:00)
+2025-12-10 14:29:57,961 INFO Job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 19:30:57 UTC)" executed successfully
+2025-12-10 14:30:03,314 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:30:07,440 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:30:17,598 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:30:21,586 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 14:30:21,587 INFO Application is stopping. This might take a moment.
+2025-12-10 14:30:21,587 INFO Scheduler has been shut down
+2025-12-10 14:30:21,608 INFO Application.stop() complete

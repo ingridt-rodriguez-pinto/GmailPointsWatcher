@@ -14,16 +14,114 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CallbackQueryHandler,
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List
+from dotenv import load_dotenv
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc")
-EMAIL_USERNAME = os.getenv("EMAIL_USERNAME", "buglione2500@gmail.com")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "tsvk jljb torw blih")
-CHAT_ID = int(os.getenv("CHAT_ID", "1943663667"))
-TIMEOUT_SECONDS = int(os.getenv("TIMEOUT_SECONDS", "60"))
+load_dotenv()
+
+# Configuración de BD desde .env
 MSSQL_SERVER = os.getenv("MSSQL_SERVER", rf"DESKTOP-UQTBU3F\MSSQLSERVER_2022")
 MSSQL_DATABASE = os.getenv("MSSQL_DATABASE", "GlobalPointsWatcher")
 MSSQL_USER = os.getenv("MSSQL_USER", "sa_giovanni")
 MSSQL_PASSWORD = os.getenv("MSSQL_PASSWORD", "pruebabd")
+
+# Valores por defecto para bootstrap (se migrarán a BD)
+DEFAULT_TELEGRAM_TOKEN = "8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc"
+DEFAULT_EMAIL_USERNAME = "buglione2500@gmail.com"
+DEFAULT_EMAIL_PASSWORD = "tsvk jljb torw blih"
+DEFAULT_CHAT_ID = "1943663667"
+TIMEOUT_SECONDS = int(os.getenv("TIMEOUT_SECONDS", "60"))
+
+# Variables globales que se llenarán desde BD
+TELEGRAM_TOKEN = None
+EMAIL_USERNAME = None
+EMAIL_PASSWORD = None
+CHAT_ID = None
+
+def _db_connect():
+    try:
+        if all([MSSQL_SERVER, MSSQL_DATABASE, MSSQL_USER, MSSQL_PASSWORD]):
+            import pyodbc  # type: ignore
+            conn = pyodbc.connect(
+                f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={MSSQL_SERVER};DATABASE={MSSQL_DATABASE};UID={MSSQL_USER};PWD={MSSQL_PASSWORD};TrustServerCertificate=yes",
+                timeout=5,
+            )
+            return conn
+    except Exception as e:
+        logging.warning(f"No se pudo conectar a SQL Server: {e}")
+    return None
+
+def db_ensure_parameters_table() -> None:
+    conn = _db_connect()
+    if not conn:
+        return
+    try:
+        cur = conn.cursor()
+        # Crear tabla si no existe
+        cur.execute(
+            """
+            IF OBJECT_ID('dbo.Parameters','U') IS NULL
+            CREATE TABLE dbo.Parameters(
+                ParamKey NVARCHAR(50) PRIMARY KEY,
+                ParamValue NVARCHAR(MAX)
+            )
+            """
+        )
+        conn.commit()
+        
+        # Insertar valores por defecto si no existen
+        defaults = {
+            "TELEGRAM_TOKEN": DEFAULT_TELEGRAM_TOKEN,
+            "EMAIL_USERNAME": DEFAULT_EMAIL_USERNAME,
+            "EMAIL_PASSWORD": DEFAULT_EMAIL_PASSWORD,
+            "CHAT_ID": DEFAULT_CHAT_ID
+        }
+        
+        for key, val in defaults.items():
+            cur.execute("SELECT 1 FROM dbo.Parameters WHERE ParamKey = ?", key)
+            if not cur.fetchone():
+                cur.execute("INSERT INTO dbo.Parameters (ParamKey, ParamValue) VALUES (?, ?)", key, val)
+        
+        conn.commit()
+    except Exception as e:
+        logging.error(f"Error asegurando tabla Parameters: {e}")
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def load_config_from_db() -> bool:
+    global TELEGRAM_TOKEN, EMAIL_USERNAME, EMAIL_PASSWORD, CHAT_ID
+    conn = _db_connect()
+    if not conn:
+        logging.error("No se pudo conectar a BD para cargar configuración")
+        return False
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT ParamKey, ParamValue FROM dbo.Parameters")
+        rows = cur.fetchall()
+        config = {row[0]: row[1] for row in rows}
+        
+        TELEGRAM_TOKEN = config.get("TELEGRAM_TOKEN")
+        EMAIL_USERNAME = config.get("EMAIL_USERNAME")
+        EMAIL_PASSWORD = config.get("EMAIL_PASSWORD")
+        try:
+            CHAT_ID = int(config.get("CHAT_ID", "0"))
+        except:
+            CHAT_ID = 0
+            
+        if not all([TELEGRAM_TOKEN, EMAIL_USERNAME, EMAIL_PASSWORD, CHAT_ID]):
+             logging.warning("Faltan configuraciones en la tabla Parameters")
+             
+        return True
+    except Exception as e:
+        logging.error(f"Error cargando configuración: {e}")
+        return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def _fmt2(value: float) -> float:
@@ -99,14 +197,24 @@ def _get_text_from_message(msg: Any) -> str:
 class GmailWatcherPython:
     def __init__(self) -> None:
         self.old_points_total = calculate_total_points()
-        self.application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        # Inicializar configuración
+        db_ensure_parameters_table()
+        if not load_config_from_db():
+            logging.error("No se pudo cargar la configuración crítica. El bot puede fallar.")
+        
+        if TELEGRAM_TOKEN:
+            self.application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        else:
+            raise ValueError("TELEGRAM_TOKEN no encontrado en BD")
+
         self._tx_pending = {}
         self._pending_card_query = set()
+        self._pending_points_action = {} # {chat_id: {"action": "add"|"redeem", "step": "card"|"amount"}}
         setup_logging()
 
     def start(self) -> None:
         if CHAT_ID == 1943663667:
-            logging.warning("⚠️ Usando CHAT_ID por defecto (1943663667). Asegúrate de configurar la variable de entorno CHAT_ID con tu ID real.")
+            logging.warning("⚠️ Usando CHAT_ID por defecto (1943663667).")
         
         self.application.add_handler(CallbackQueryHandler(self._on_recognize, pattern=r"^(rec|recdb):"))
         self.application.add_handler(CallbackQueryHandler(self._on_menu, pattern=r"^menu:"))
@@ -116,6 +224,7 @@ class GmailWatcherPython:
         self.application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), self._on_text))
         try:
             db_ensure_recognition_table()
+            db_ensure_unrecognized_table()
             db_ensure_monthly_summary_sp()
         except Exception:
             pass
@@ -202,6 +311,8 @@ class GmailWatcherPython:
             logging.info(f"TX {token} {tx['company']} ${_fmt2(tx['amount'])} {tx['card']} status={status}")
             try:
                 db_insert_recognition(token, tx['company'], tx['amount'], tx['card'], status, datetime.now())
+                if status == "NO RECONOCIDA":
+                    db_insert_unrecognized(token, tx['company'], tx['amount'], tx['card'], datetime.now())
             except Exception:
                 pass
             await q.answer()
@@ -224,6 +335,8 @@ class GmailWatcherPython:
                 # Generate a synthetic token or use "DB:{id}"
                 token = f"DB:{tx_id}"
                 db_insert_recognition(token, tx_data['company'], tx_data['amount'], tx_data['card'], status, datetime.now())
+                if status == "NO RECONOCIDA":
+                    db_insert_unrecognized(token, tx_data['company'], tx_data['amount'], tx_data['card'], datetime.now())
                 await q.answer(f"Marcada como {status}")
                 await q.edit_message_reply_markup(reply_markup=None)
                 await context.bot.send_message(
@@ -256,6 +369,25 @@ class GmailWatcherPython:
                 await self._cmd_status(update, context)
             elif key == "historial":
                 await self._cmd_historial(update, context)
+            elif key == "gestionar":
+                await self._cmd_gestionar_puntos_menu(update, context)
+            elif key == "add_points":
+                await self._init_points_action(update, context, "add")
+            elif key == "redeem_points":
+                await self._init_points_action(update, context, "redeem")
+
+    async def _cmd_gestionar_puntos_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_chat.id
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("➕ Agregar Puntos", callback_data="menu:add_points")],
+            [InlineKeyboardButton("➖ Canjear Puntos", callback_data="menu:redeem_points")],
+        ])
+        await context.bot.send_message(chat_id=chat_id, text="🔢 *Gestión de Puntos*\nSelecciona una opción:", reply_markup=kb, parse_mode="Markdown")
+
+    async def _init_points_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE, action: str) -> None:
+        chat_id = update.effective_chat.id
+        self._pending_points_action[chat_id] = {"action": action, "step": "card", "data": {}}
+        await context.bot.send_message(chat_id=chat_id, text="💳 Ingresa los últimos 4 dígitos de la tarjeta:")
 
     async def _cmd_puntos(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         total_points = calculate_total_points()
@@ -266,9 +398,56 @@ class GmailWatcherPython:
 
     async def _on_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         chat_id = update.effective_chat.id
-        if chat_id not in self._pending_card_query:
-            return
         text = (update.message.text or "").strip()
+
+        # Handle Points Action (Add/Redeem)
+        if chat_id in self._pending_points_action:
+            state = self._pending_points_action[chat_id]
+            if state["step"] == "card":
+                m = re.search(r"\b(\d{4})\b", text)
+                if not m:
+                    await context.bot.send_message(chat_id=chat_id, text="❌ Por favor, envía 4 dígitos válidos.")
+                    return
+                state["data"]["card"] = m.group(1)
+                state["step"] = "amount"
+                action_text = "agregar" if state["action"] == "add" else "canjear"
+                await context.bot.send_message(chat_id=chat_id, text=f"💰 Ingresa la cantidad de puntos a {action_text}:")
+            elif state["step"] == "amount":
+                try:
+                    points = int(text)
+                    if points <= 0:
+                        raise ValueError
+                    card = state["data"]["card"]
+                    action = state["action"]
+                    
+                    final_points = points if action == "add" else -points
+                    company = "Ajuste Manual: Agregar" if action == "add" else "Canje de Puntos"
+                    
+                    if action == "redeem":
+                        current_pts = db_sum_points_by_card(card)
+                        if current_pts < points:
+                            await context.bot.send_message(chat_id=chat_id, text=f"❌ Saldo insuficiente. Tienes {current_pts} puntos.")
+                            del self._pending_points_action[chat_id]
+                            return
+
+                    try:
+                        db_insert_transaction(company, "Global Bank", card, 0.0, final_points, datetime.now())
+                        emoji = "✅" if action == "add" else "🎁"
+                        msg = f"{emoji} Operación exitosa.\nTarjeta: {card}\nPuntos: {final_points:+}\nNuevo saldo: {db_sum_points_by_card(card)}"
+                        await context.bot.send_message(chat_id=chat_id, text=msg)
+                    except Exception as e:
+                         await context.bot.send_message(chat_id=chat_id, text="❌ Error al guardar en base de datos.")
+
+                    del self._pending_points_action[chat_id]
+                except ValueError:
+                    await context.bot.send_message(chat_id=chat_id, text="❌ Ingresa un número entero válido mayor a 0.")
+            return
+
+        if chat_id not in self._pending_card_query:
+            # Si no estamos esperando un dato, mostramos el menú
+            await self._cmd_start(update, context)
+            return
+        
         m = re.search(r"\b(\d{4})\b", text)
         if not m:
             await context.bot.send_message(chat_id=chat_id, text="Por favor, envía solo los últimos 4 dígitos")
@@ -609,6 +788,60 @@ def db_insert_recognition(token: str, company: str, amount_usd: float, card_last
             float(amount_usd),
             card_last4,
             status,
+            dt,
+        )
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def db_ensure_unrecognized_table() -> None:
+    conn = _db_connect()
+    if not conn:
+        return
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            IF OBJECT_ID('dbo.UnrecognizedTransactions','U') IS NULL
+            CREATE TABLE dbo.UnrecognizedTransactions(
+            Id INT IDENTITY(1,1) PRIMARY KEY,
+            Token NVARCHAR(128) NOT NULL,
+            Company NVARCHAR(256) NOT NULL,
+            AmountUSD DECIMAL(18,2) NOT NULL,
+            CardLast4 CHAR(4) NOT NULL,
+            ReportedAt DATETIME NOT NULL
+            )
+            """
+        )
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def db_insert_unrecognized(token: str, company: str, amount_usd: float, card_last4: str, dt: datetime) -> None:
+    conn = _db_connect()
+    if not conn:
+        return
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO dbo.UnrecognizedTransactions(Token, Company, AmountUSD, CardLast4, ReportedAt)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            token,
+            company,
+            float(amount_usd),
+            card_last4,
             dt,
         )
         conn.commit()

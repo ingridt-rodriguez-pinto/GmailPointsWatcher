@@ -236,13 +236,14 @@ class GmailWatcherPython:
     async def _email_job(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         items = await asyncio.to_thread(self._process_emails)
         for it in items:
+            chat_id = it.get("chat_id", CHAT_ID)
             kb = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("Reconocida", callback_data=f"rec:{it['token']}:Y"),
                     InlineKeyboardButton("No reconocida", callback_data=f"rec:{it['token']}:N"),
                 ]
             ])
-            await context.bot.send_message(chat_id=CHAT_ID, text=it["text"], reply_markup=kb)
+            await context.bot.send_message(chat_id=chat_id, text=it["text"], reply_markup=kb)
 
     def _process_emails(self) -> list:
         M = imaplib.IMAP4_SSL("imap.gmail.com")
@@ -254,6 +255,7 @@ class GmailWatcherPython:
             M.logout()
             return []
 
+        card_map = db_get_all_user_cards_map()
         items_out = []
         ids = data[0].split()
         for num in ids:
@@ -273,8 +275,11 @@ class GmailWatcherPython:
                     "amount": usd_value,
                     "card": card_last4,
                 }
-                items_out.append({"text": m1, "token": token})
-                items_out.append({"text": m2, "token": token})
+                
+                target_chat_ids = card_map.get(card_last4, [CHAT_ID])
+                for cid in target_chat_ids:
+                    items_out.append({"text": m1, "token": token, "chat_id": cid})
+                    items_out.append({"text": m2, "token": token, "chat_id": cid})
             finally:
                 M.store(num, "+FLAGS", "\\Seen")
 
@@ -385,6 +390,8 @@ class GmailWatcherPython:
                 await self._cmd_list_cards(update, context)
             elif key == "email_report":
                 await self._trigger_email_report(update, context)
+            elif key == "start":
+                await self._cmd_start(update, context)
 
     async def _trigger_email_report(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         chat_id = update.effective_chat.id
@@ -398,30 +405,33 @@ class GmailWatcherPython:
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("➕ Agregar Tarjeta", callback_data="menu:add_card")],
             [InlineKeyboardButton("📋 Listar Mis Tarjetas", callback_data="menu:list_cards")],
+            [InlineKeyboardButton("🔙 Menú Principal", callback_data="menu:start")],
         ])
         await context.bot.send_message(chat_id=chat_id, text="💳 *Gestión de Tarjetas*", reply_markup=kb, parse_mode="Markdown")
 
     async def _init_add_card(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         chat_id = update.effective_chat.id
         self._pending_points_action[chat_id] = {"action": "add_card", "step": "card_number", "data": {}}
-        await context.bot.send_message(chat_id=chat_id, text="💳 Ingresa los últimos 4 dígitos de la nueva tarjeta:")
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data="menu:cards")]])
+        await context.bot.send_message(chat_id=chat_id, text="💳 Ingresa los últimos 4 dígitos de la nueva tarjeta:", reply_markup=kb)
 
     async def _cmd_list_cards(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         chat_id = update.effective_chat.id
         cards = db_get_user_cards(chat_id)
-        if not cards:
-            await context.bot.send_message(chat_id=chat_id, text="📭 No tienes tarjetas registradas.")
-            return
-        
         kb_rows = []
-        for c in cards:
-            label = f"💳 {c['card']}"
-            if c['alias']:
-                label += f" ({c['alias']})"
-            kb_rows.append([InlineKeyboardButton(label, callback_data=f"card:select:{c['id']}")])
+        if not cards:
+             msg = "📭 No tienes tarjetas registradas."
+        else:
+             msg = "Selecciona una tarjeta para gestionar:"
+             for c in cards:
+                 label = f"💳 {c['card']}"
+                 if c['alias']:
+                     label += f" ({c['alias']})"
+                 kb_rows.append([InlineKeyboardButton(label, callback_data=f"card:select:{c['id']}")])
         
+        kb_rows.append([InlineKeyboardButton("🔙 Volver", callback_data="menu:cards")])
         kb = InlineKeyboardMarkup(kb_rows)
-        await context.bot.send_message(chat_id=chat_id, text="Selecciona una tarjeta para gestionar:", reply_markup=kb)
+        await context.bot.send_message(chat_id=chat_id, text=msg, reply_markup=kb)
 
     async def _on_card_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         q = update.callback_query
@@ -536,28 +546,30 @@ class GmailWatcherPython:
              state = self._pending_points_action[chat_id]
              if state["action"] == "add_card" and state["step"] == "card_number":
                  m = re.search(r"\b(\d{4})\b", text)
+                 kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Volver a Tarjetas", callback_data="menu:cards")]])
                  if not m:
-                     await context.bot.send_message(chat_id=chat_id, text="❌ Por favor, envía 4 dígitos válidos.")
+                     await context.bot.send_message(chat_id=chat_id, text="❌ Por favor, envía 4 dígitos válidos.", reply_markup=kb)
                      return
                  card = m.group(1)
                  if db_add_user_card(chat_id, card):
-                     await context.bot.send_message(chat_id=chat_id, text=f"✅ Tarjeta {card} guardada correctamente.")
+                     await context.bot.send_message(chat_id=chat_id, text=f"✅ Tarjeta {card} guardada correctamente.", reply_markup=kb)
                  else:
-                     await context.bot.send_message(chat_id=chat_id, text=f"❌ Error: La tarjeta ya existe o hubo un problema.")
+                     await context.bot.send_message(chat_id=chat_id, text=f"❌ Error: La tarjeta ya existe o hubo un problema.", reply_markup=kb)
                  del self._pending_points_action[chat_id]
                  return
              
              if state["action"] == "edit_card" and state["step"] == "new_number":
                  m = re.search(r"\b(\d{4})\b", text)
+                 kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Volver a Tarjetas", callback_data="menu:cards")]])
                  if not m:
-                     await context.bot.send_message(chat_id=chat_id, text="❌ Por favor, envía 4 dígitos válidos.")
+                     await context.bot.send_message(chat_id=chat_id, text="❌ Por favor, envía 4 dígitos válidos.", reply_markup=kb)
                      return
                  new_card = m.group(1)
                  card_id = state["data"]["id"]
                  if db_update_user_card(card_id, new_card):
-                     await context.bot.send_message(chat_id=chat_id, text=f"✅ Tarjeta actualizada a {new_card}.")
+                     await context.bot.send_message(chat_id=chat_id, text=f"✅ Tarjeta actualizada a {new_card}.", reply_markup=kb)
                  else:
-                     await context.bot.send_message(chat_id=chat_id, text="❌ Error al actualizar tarjeta.")
+                     await context.bot.send_message(chat_id=chat_id, text="❌ Error al actualizar tarjeta.", reply_markup=kb)
                  del self._pending_points_action[chat_id]
                  return
 
@@ -1044,6 +1056,30 @@ def db_delete_user_card(card_id: int) -> bool:
         return True
     except Exception:
         return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def db_get_all_user_cards_map() -> Dict[str, List[int]]:
+    conn = _db_connect()
+    if not conn:
+        return {}
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT CardLast4, ChatId FROM dbo.UserCards")
+        rows = cur.fetchall()
+        mapping = {}
+        for r in rows:
+            card = r[0]
+            chat_id = r[1]
+            if card not in mapping:
+                mapping[card] = []
+            mapping[card].append(chat_id)
+        return mapping
+    except Exception:
+        return {}
     finally:
         try:
             conn.close()

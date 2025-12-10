@@ -18,9 +18,9 @@ from typing import Any, Dict, List
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc")
 EMAIL_USERNAME = os.getenv("EMAIL_USERNAME", "buglione2500@gmail.com")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "tsvk jljb torw blih")
-CHAT_ID = int(os.getenv("CHAT_ID", "2"))
+CHAT_ID = int(os.getenv("CHAT_ID", "1943663667"))
 TIMEOUT_SECONDS = int(os.getenv("TIMEOUT_SECONDS", "60"))
-MSSQL_SERVER = os.getenv("MSSQL_SERVER", "DESKTOP-UQTBU3F\\MSSQLSERVER_2022")
+MSSQL_SERVER = os.getenv("MSSQL_SERVER", rf"DESKTOP-UQTBU3F\MSSQLSERVER_2022")
 MSSQL_DATABASE = os.getenv("MSSQL_DATABASE", "GlobalPointsWatcher")
 MSSQL_USER = os.getenv("MSSQL_USER", "sa_giovanni")
 MSSQL_PASSWORD = os.getenv("MSSQL_PASSWORD", "pruebabd")
@@ -105,12 +105,18 @@ class GmailWatcherPython:
         setup_logging()
 
     def start(self) -> None:
-        self.application.add_handler(CallbackQueryHandler(self._on_recognize))
+        if CHAT_ID == 1943663667:
+            logging.warning("⚠️ Usando CHAT_ID por defecto (1943663667). Asegúrate de configurar la variable de entorno CHAT_ID con tu ID real.")
+        
+        self.application.add_handler(CallbackQueryHandler(self._on_recognize, pattern=r"^(rec|recdb):"))
+        self.application.add_handler(CallbackQueryHandler(self._on_menu, pattern=r"^menu:"))
         self.application.add_handler(CommandHandler("puntos", self._cmd_puntos))
         self.application.add_handler(CommandHandler("start", self._cmd_start))
+        self.application.add_handler(CommandHandler("status", self._cmd_status))
         self.application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), self._on_text))
         try:
             db_ensure_recognition_table()
+            db_ensure_monthly_summary_sp()
         except Exception:
             pass
         self.application.job_queue.run_repeating(self._email_job, interval=TIMEOUT_SECONDS, first=0)
@@ -205,6 +211,34 @@ class GmailWatcherPython:
                 text=f"Transacción {tx['company']} ${_fmt2(tx['amount'])} terminación {tx['card']} marcada como {status}"
             )
             return
+        if parts[0] == "recdb" and len(parts) == 3:
+            tx_id_str = parts[1]
+            ans = parts[2]
+            try:
+                tx_id = int(tx_id_str)
+                tx_data = db_get_transaction_by_id(tx_id)
+                if not tx_data:
+                     await q.answer("Transacción no encontrada")
+                     return
+                status = "RECONOCIDA" if ans == "Y" else "NO RECONOCIDA"
+                # Generate a synthetic token or use "DB:{id}"
+                token = f"DB:{tx_id}"
+                db_insert_recognition(token, tx_data['company'], tx_data['amount'], tx_data['card'], status, datetime.now())
+                await q.answer(f"Marcada como {status}")
+                await q.edit_message_reply_markup(reply_markup=None)
+                await context.bot.send_message(
+                    chat_id=q.message.chat_id,
+                    text=f"✅ Transacción {tx_data['company']} marcada como {status}"
+                )
+            except Exception:
+                await q.answer("Error al procesar")
+            return
+
+    async def _on_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        q = update.callback_query
+        if not q or not q.data:
+            return
+        parts = q.data.split(":")
         if parts[0] == "menu" and len(parts) == 2:
             key = parts[1]
             await q.answer()
@@ -218,6 +252,10 @@ class GmailWatcherPython:
                 await context.bot.send_message(chat_id=q.message.chat_id, text=self._help_text())
             elif key == "resumen":
                 await self._cmd_resumen(update, context)
+            elif key == "status":
+                await self._cmd_status(update, context)
+            elif key == "historial":
+                await self._cmd_historial(update, context)
 
     async def _cmd_puntos(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         total_points = calculate_total_points()
@@ -247,6 +285,114 @@ class GmailWatcherPython:
     # No se requiere interacción por Telegram; los puntos son fijos (1 punto por $1).
 
 
+    async def _cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_chat.id
+        logging.info(f"Comando /start recibido del CHAT_ID: {chat_id}")
+        
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💰 Mis Puntos", callback_data="menu:puntos")],
+            [InlineKeyboardButton("📜 Historial Reciente", callback_data="menu:historial")],
+            [InlineKeyboardButton("📊 Resumen Mensual", callback_data="menu:resumen")],
+            [InlineKeyboardButton("❓ Ayuda", callback_data="menu:ayuda")],
+            [InlineKeyboardButton("🛠 Estado", callback_data="menu:status")],
+        ])
+        
+        msg_text = "¡Hola! Soy tu asistente de Puntos Global Bank.\n¿Qué deseas hacer hoy?"
+        if chat_id != CHAT_ID:
+            msg_text += f"\n\n⚠️ *Nota:* Tu ID es `{chat_id}`. El bot está configurado para `{CHAT_ID}`. Actualiza la variable de entorno `CHAT_ID` para recibir notificaciones automáticas."
+
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=msg_text,
+            reply_markup=kb,
+            parse_mode="Markdown"
+        )
+
+    def _help_text(self) -> str:
+        return (
+            "🤖 *Ayuda del Bot*\n\n"
+            "💰 *Mis Puntos*: Consulta puntos acumulados por tarjeta.\n"
+            "📜 *Historial*: Ver y validar tus últimas transacciones.\n"
+            "📊 *Resumen*: Reporte mensual de actividad.\n"
+            "✅ *Validación*: Marca transacciones como reconocidas/no reconocidas."
+        )
+
+    async def _cmd_resumen(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_chat.id
+        s = db_monthly_summary(None)
+        txt = (
+            f"📅 *Resumen {s['year']}-{s['month']:02d}*\n"
+            f"⭐ Puntos: {int(s['points'])}\n"
+            f"💵 USD: ${points_to_usd(s['points'])}\n"
+            f"🏆 Top comercio: {s['top_company'] or '–'}"
+        )
+        await context.bot.send_message(chat_id=chat_id, text=txt, parse_mode="Markdown")
+
+    async def _cmd_historial(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_chat.id
+        txs = db_get_recent_transactions_with_status(limit=5)
+        if not txs:
+            await context.bot.send_message(chat_id=chat_id, text="📭 No hay transacciones recientes.")
+            return
+        
+        await context.bot.send_message(chat_id=chat_id, text="📜 *Últimas 5 transacciones:*", parse_mode="Markdown")
+        
+        for tx in txs:
+            status_emoji = "✅" if tx['status'] == "RECONOCIDA" else ("❌" if tx['status'] == "NO RECONOCIDA" else "❓")
+            date_str = tx['date'].strftime("%Y-%m-%d %H:%M")
+            txt = (
+                f"{date_str}\n"
+                f"🛒 {tx['company']}\n"
+                f"💰 ${tx['amount']} (Tarjeta {tx['card']})\n"
+                f"Estado: {status_emoji} {tx['status'] or 'Pendiente'}"
+            )
+            
+            kb = None
+            if not tx['status']: 
+                kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("✅ Sí", callback_data=f"recdb:{tx['id']}:Y"),
+                        InlineKeyboardButton("❌ No", callback_data=f"recdb:{tx['id']}:N"),
+                    ]
+                ])
+            
+            await context.bot.send_message(chat_id=chat_id, text=txt, reply_markup=kb)
+
+    async def _cmd_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_chat.id
+        
+        # Check DB
+        db_ok = False
+        try:
+            conn = _db_connect()
+            if conn:
+                conn.close()
+                db_ok = True
+        except:
+            pass
+        
+        # Check IMAP
+        imap_ok = False
+        try:
+            M = imaplib.IMAP4_SSL("imap.gmail.com")
+            M.login(EMAIL_USERNAME, EMAIL_PASSWORD)
+            M.logout()
+            imap_ok = True
+        except Exception as e:
+            logging.error(f"IMAP Check failed: {e}")
+            pass
+
+        msg = (
+            f"🛠 *Estado del Sistema*\n\n"
+            f"📅 Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"👤 Chat ID: `{chat_id}`\n"
+            f"⚙️ Configurado: `{CHAT_ID}`\n"
+            f"🗄 Base de Datos: {'✅ Conectado' if db_ok else '❌ Error'}\n"
+            f"📧 Correo (IMAP): {'✅ Conectado' if imap_ok else '❌ Error'}\n"
+        )
+        await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--totales", action="store_true")
@@ -261,7 +407,17 @@ def main() -> None:
     parser.add_argument("--year", type=int)
     parser.add_argument("--month", type=int)
     parser.add_argument("--csv", type=str)
+    parser.add_argument("--create-job", action="store_true")
+    parser.add_argument("--job-card", type=str)
+    parser.add_argument("--job-email", type=str)
     args = parser.parse_args()
+
+    if args.create_job and args.job_card and args.job_email:
+        if db_create_summary_job(args.job_card, args.job_email):
+            print(f"Job SQL Server creado para tarjeta {args.job_card} enviando a {args.job_email}")
+        else:
+            print("El Job ya existe o hubo un error al crearlo.")
+        return
 
     if args.totales:
         total_points = calculate_total_points()
@@ -417,19 +573,20 @@ def db_ensure_recognition_table() -> None:
             """
             IF OBJECT_ID('dbo.TransactionRecognitions','U') IS NULL
             CREATE TABLE dbo.TransactionRecognitions(
-                Id INT IDENTITY(1,1) PRIMARY KEY,
-                Token NVARCHAR(128) NOT NULL,
-                Company NVARCHAR(256) NOT NULL,
-                AmountUSD DECIMAL(18,2) NOT NULL,
-                CardLast4 CHAR(4) NOT NULL,
-                Status NVARCHAR(20) NOT NULL,
-                RecognizedAt DATETIME NOT NULL
+            Id INT IDENTITY(1,1) PRIMARY KEY,
+            Token NVARCHAR(128) NOT NULL,
+            Company NVARCHAR(256) NOT NULL,
+            AmountUSD DECIMAL(18,2) NOT NULL,
+            CardLast4 CHAR(4) NOT NULL,
+            Status NVARCHAR(20) NOT NULL,
+            RecognizedAt DATETIME NOT NULL
             )
             """
         )
         conn.commit()
+        return True
     except Exception:
-        pass
+        return False
     finally:
         try:
             conn.close()
@@ -457,6 +614,74 @@ def db_insert_recognition(token: str, company: str, amount_usd: float, card_last
         conn.commit()
     except Exception:
         pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def db_get_transaction_by_id(tx_id: int) -> Dict[str, Any] | None:
+    conn = _db_connect()
+    if not conn:
+        return None
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT Company, AmountUSD, CardLast4
+            FROM dbo.Transactions
+            WHERE Id = ?
+            """,
+            tx_id,
+        )
+        r = cur.fetchone()
+        if r:
+            return {"company": r[0], "amount": float(r[1]), "card": r[2]}
+        return None
+    except Exception:
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def db_get_recent_transactions_with_status(limit: int = 5) -> List[Dict[str, Any]]:
+    conn = _db_connect()
+    if not conn:
+        return []
+    try:
+        cur = conn.cursor()
+        # Use Outer Apply or Subquery to get status
+        cur.execute(
+            """
+            SELECT TOP (?)
+                T.Id, T.Company, T.AmountUSD, T.CardLast4, T.TransactionAt,
+                (SELECT TOP 1 Status FROM dbo.TransactionRecognitions R
+                 WHERE R.Company = T.Company
+                   AND R.AmountUSD = T.AmountUSD
+                   AND R.CardLast4 = T.CardLast4
+                   AND ABS(DATEDIFF(minute, R.RecognizedAt, GETDATE())) < 43200 -- 30 days lookup window or similar? actually better just match fields
+                 ORDER BY R.RecognizedAt DESC) as Status
+            FROM dbo.Transactions T
+            ORDER BY T.TransactionAt DESC
+            """,
+            limit,
+        )
+        rows = cur.fetchall()
+        out = []
+        for r in rows:
+            out.append({
+                "id": r[0],
+                "company": r[1],
+                "amount": float(r[2]),
+                "card": r[3],
+                "date": r[4],
+                "status": r[5],
+            })
+        return out
+    except Exception:
+        return []
     finally:
         try:
             conn.close()
@@ -561,8 +786,10 @@ def db_ensure_monthly_summary_sp() -> None:
             AS
             BEGIN
                 SET NOCOUNT ON;
-                DECLARE @Year INT = YEAR(GETDATE());
-                DECLARE @Month INT = MONTH(GETDATE());
+                -- Report on the previous month since this runs on the 1st
+                DECLARE @Dt DATE = DATEADD(month, -1, GETDATE());
+                DECLARE @Year INT = YEAR(@Dt);
+                DECLARE @Month INT = MONTH(@Dt);
                 DECLARE @TotalPoints INT = 0;
                 DECLARE @TopCompany NVARCHAR(256) = NULL;
                 SELECT @TotalPoints = COALESCE(SUM(Points),0)
@@ -574,6 +801,7 @@ def db_ensure_monthly_summary_sp() -> None:
                     FROM dbo.Transactions
                     WHERE YEAR(TransactionAt)=@Year AND MONTH(TransactionAt)=@Month AND CardLast4=@CardLast4
                     GROUP BY Company
+                    ORDER BY P DESC
                 ) T
                 ORDER BY P DESC;
                 DECLARE @MonthName NVARCHAR(20) = DATENAME(MONTH, DATEFROMPARTS(@Year, @Month, 1));
@@ -601,22 +829,23 @@ def db_ensure_monthly_summary_sp() -> None:
         except Exception:
             pass
 
-def db_create_summary_job(card_last4: str, send_to: str, profile_name: str = 'DefaultProfile') -> None:
+def db_create_summary_job(card_last4: str, send_to: str, profile_name: str = 'DefaultProfile') -> bool:
     conn = _db_connect()
     if not conn:
-        return
+        return False
     try:
         cur = conn.cursor()
         cur.execute("SELECT job_id FROM msdb.dbo.sysjobs WHERE name = 'GlobalPointsMonthlySummary'")
         r = cur.fetchone()
         if r:
-            return
+            logging.info("El Job 'GlobalPointsMonthlySummary' ya existe. Omitiendo creación.")
+            return False
         cur.execute(
             """
             DECLARE @job_id UNIQUEIDENTIFIER;
             EXEC msdb.dbo.sp_add_job @job_name = N'GlobalPointsMonthlySummary', @enabled = 1, @job_id = @job_id OUTPUT;
             EXEC msdb.dbo.sp_add_jobstep @job_name = N'GlobalPointsMonthlySummary', @step_name = N'Send Summary', @subsystem = N'TSQL',
-                @command = N'EXEC dbo.sp_SendMonthlySummaryEmail @CardLast4=''' + ? + ''', @SendTo=''' + ? + ''', @ProfileName=''' + ? + '''';
+            @command = N'EXEC dbo.sp_SendMonthlySummaryEmail @CardLast4=''' + ? + ''', @SendTo=''' + ? + ''', @ProfileName=''' + ? + '''';
             EXEC msdb.dbo.sp_add_schedule @schedule_name = N'MonthlySummarySchedule', @freq_type = 16, @freq_interval = 1, @active_start_time = 80000;
             EXEC msdb.dbo.sp_attach_schedule @job_name = N'GlobalPointsMonthlySummary', @schedule_name = N'MonthlySummarySchedule';
             EXEC msdb.dbo.sp_add_jobserver @job_name = N'GlobalPointsMonthlySummary';
@@ -626,39 +855,14 @@ def db_create_summary_job(card_last4: str, send_to: str, profile_name: str = 'De
             profile_name,
         )
         conn.commit()
+        return True
     except Exception:
-        pass
+        return False
     finally:
         try:
             conn.close()
         except Exception:
             pass
-    async def _cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        chat_id = update.effective_chat.id
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Consultar puntos", callback_data="menu:puntos")],
-            [InlineKeyboardButton("Ver totales", callback_data="menu:totales")],
-            [InlineKeyboardButton("Resumen mensual", callback_data="menu:resumen")],
-            [InlineKeyboardButton("Ayuda", callback_data="menu:ayuda")],
-        ])
-        await context.bot.send_message(chat_id=chat_id, text=self._help_text(), reply_markup=kb)
 
-    def _help_text(self) -> str:
-        return (
-            "Opciones:\n"
-            "- /puntos: muestra total y solicita últimos 4 dígitos\n"
-            "- /resumen: resumen mensual y top comercio\n"
-            "- Botones Reconocida/No reconocida: marcan la transacción y se guardan\n"
-            "- Ver totales: consulta tus puntos acumulados y equivalente USD\n"
-            "- Reporte mensual CLI: --recon-report [--year --month --csv]"
-        )
-
-    async def _cmd_resumen(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        chat_id = update.effective_chat.id
-        s = db_monthly_summary(None)
-        txt = (
-            f"Resumen {s['year']}-{s['month']:02d}:\n"
-            f"Puntos: {int(s['points'])} | USD: ${points_to_usd(s['points'])}\n"
-            f"Top comercio: {s['top_company'] or '–'}"
-        )
-        await context.bot.send_message(chat_id=chat_id, text=txt)
+if __name__ == "__main__":
+    main()

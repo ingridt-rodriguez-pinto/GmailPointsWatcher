@@ -1,0 +1,125 @@
+2025-12-10 08:45:51,853 WARNING ⚠️ Usando CHAT_ID por defecto (1943663667). Asegúrate de configurar la variable de entorno CHAT_ID con tu ID real.
+2025-12-10 08:55:25,300 WARNING ⚠️ Usando CHAT_ID por defecto (1943663667). Asegúrate de configurar la variable de entorno CHAT_ID con tu ID real.
+2025-12-10 08:55:25,345 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-12-10 08:55:25,992 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getMe "HTTP/1.1 200 OK"
+2025-12-10 08:55:26,155 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/deleteWebhook "HTTP/1.1 200 OK"
+2025-12-10 08:55:26,158 INFO Added job "_email_job" to job store "default"
+2025-12-10 08:55:26,158 INFO Scheduler started
+2025-12-10 08:55:26,159 INFO Application started
+2025-12-10 08:55:26,611 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:55:36,763 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:55:46,918 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:55:57,070 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:56:07,224 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:56:17,376 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:56:25,354 INFO Running job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 13:57:25 UTC)" (scheduled at 2025-12-10 13:56:25.344717+00:00)
+2025-12-10 08:56:27,527 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:56:32,657 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:32,941 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:33,225 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:33,514 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:33,792 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:34,069 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:34,348 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:34,625 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:34,904 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:35,183 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:35,462 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:35,757 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:36,034 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:36,313 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:36,590 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:36,892 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:37,170 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:37,471 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:37,679 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:56:37,745 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:38,044 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:38,322 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:38,599 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:38,883 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:39,163 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:39,452 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:39,731 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:40,062 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:40,339 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:40,622 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:40,899 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/sendMessage "HTTP/1.1 200 OK"
+2025-12-10 08:56:40,900 INFO Job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 13:57:25 UTC)" executed successfully
+2025-12-10 08:56:47,830 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:56:57,985 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:57:08,136 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:57:18,289 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:57:25,360 INFO Running job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 13:58:25 UTC)" (scheduled at 2025-12-10 13:57:25.344717+00:00)
+2025-12-10 08:57:26,171 INFO Job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 13:58:25 UTC)" executed successfully
+2025-12-10 08:57:28,444 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 08:57:38,596 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:48:39,961 WARNING ⚠️ Usando CHAT_ID por defecto (1943663667). Asegúrate de configurar la variable de entorno CHAT_ID con tu ID real.
+2025-12-10 10:48:39,985 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-12-10 10:48:40,627 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getMe "HTTP/1.1 200 OK"
+2025-12-10 10:48:40,786 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/deleteWebhook "HTTP/1.1 200 OK"
+2025-12-10 10:48:40,788 INFO Added job "_email_job" to job store "default"
+2025-12-10 10:48:40,788 INFO Scheduler started
+2025-12-10 10:48:40,788 INFO Application started
+2025-12-10 10:48:51,245 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:48:57,576 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:48:58,147 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-12-10 10:49:06,805 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:49:07,373 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-12-10 10:49:13,960 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:49:14,685 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/answerCallbackQuery "HTTP/1.1 200 OK"
+2025-12-10 10:49:24,121 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:49:34,282 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:49:39,990 INFO Running job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:50:39 UTC)" (scheduled at 2025-12-10 15:49:39.984361+00:00)
+2025-12-10 10:49:40,893 INFO Job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:50:39 UTC)" executed successfully
+2025-12-10 10:49:44,439 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:49:54,596 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:50:04,752 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:50:14,907 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:50:25,065 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:50:35,219 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:50:39,994 INFO Running job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:51:39 UTC)" (scheduled at 2025-12-10 15:50:39.984361+00:00)
+2025-12-10 10:50:40,616 INFO Job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:51:39 UTC)" executed successfully
+2025-12-10 10:50:45,377 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:50:55,530 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:51:05,684 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:51:15,838 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:51:25,995 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:51:36,156 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:51:39,994 INFO Running job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:52:39 UTC)" (scheduled at 2025-12-10 15:51:39.984361+00:00)
+2025-12-10 10:51:40,624 INFO Job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:52:39 UTC)" executed successfully
+2025-12-10 10:51:46,309 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:51:56,468 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:52:06,629 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:52:16,789 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:52:26,942 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:52:37,097 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:52:39,986 INFO Running job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:53:39 UTC)" (scheduled at 2025-12-10 15:52:39.984361+00:00)
+2025-12-10 10:52:40,767 INFO Job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:53:39 UTC)" executed successfully
+2025-12-10 10:52:47,253 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:52:57,409 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:53:07,564 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:53:17,719 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:53:27,874 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:53:38,037 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:53:39,985 INFO Running job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:54:39 UTC)" (scheduled at 2025-12-10 15:53:39.984361+00:00)
+2025-12-10 10:53:40,609 INFO Job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:54:39 UTC)" executed successfully
+2025-12-10 10:53:48,196 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:53:58,352 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:54:08,512 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:54:18,676 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:54:28,841 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:54:38,997 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:54:39,989 INFO Running job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:55:39 UTC)" (scheduled at 2025-12-10 15:54:39.984361+00:00)
+2025-12-10 10:54:40,581 INFO Job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:55:39 UTC)" executed successfully
+2025-12-10 10:54:49,156 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:54:59,312 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:55:09,471 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:55:19,624 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:55:29,776 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:55:39,929 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:55:39,986 INFO Running job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:56:39 UTC)" (scheduled at 2025-12-10 15:55:39.984361+00:00)
+2025-12-10 10:55:40,776 INFO Job "_email_job (trigger: interval[0:01:00], next run at: 2025-12-10 15:56:39 UTC)" executed successfully
+2025-12-10 10:55:50,087 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:56:00,249 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"
+2025-12-10 10:56:10,403 INFO HTTP Request: POST https://api.telegram.org/bot8428323516:AAElzjmSPfUeCoTGKbm7wnDLSZ5ek1-6Gvc/getUpdates "HTTP/1.1 200 OK"

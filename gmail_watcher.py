@@ -455,6 +455,15 @@ class GmailWatcherPython:
             ])
             await q.edit_message_text(text=f"Tarjeta seleccionada (ID {card_id}). ¿Qué deseas hacer?", reply_markup=kb)
         
+        elif action == "query_points":
+            card_last4 = parts[2]
+            pts = db_sum_points_by_card(card_last4)
+            usd = points_to_usd(pts)
+            await q.answer()
+            # Mostramos el resultado y volvemos a mostrar el menú de puntos
+            await context.bot.send_message(chat_id=chat_id, text=f"💳 Tarjeta {card_last4}\n⭐ Puntos: {int(pts)}\n💵 Equivalente: ${usd}")
+            await self._cmd_puntos(update, context)
+
         elif action == "delete":
             await q.answer()
             kb = InlineKeyboardMarkup([
@@ -463,6 +472,26 @@ class GmailWatcherPython:
             ])
             await q.edit_message_text(text=f"¿Estás seguro de eliminar esta tarjeta?", reply_markup=kb)
         
+        elif action == "save_new":
+            card_val = str(parts[2]).zfill(4)
+            if db_add_user_card(chat_id, card_val):
+                await q.answer("Guardada")
+                await q.edit_message_text(f"✅ Tarjeta {card_val} guardada correctamente.")
+                if chat_id in self._pending_points_action:
+                    del self._pending_points_action[chat_id]
+                await self._cmd_list_cards(update, context)
+            else:
+                await q.answer("Error")
+                await q.edit_message_text(f"❌ La tarjeta {card_val} ya existe o hubo un error.")
+                kb = InlineKeyboardMarkup([[InlineKeyboardButton("📋 Listar Tarjetas", callback_data="menu:list_cards")]])
+                await context.bot.send_message(chat_id=chat_id, text="Intenta nuevamente o gestiona tus tarjetas.", reply_markup=kb)
+
+        elif action == "retry_add":
+            await q.answer()
+            self._pending_points_action[chat_id] = {"action": "add_card", "step": "card_number", "data": {}}
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data="menu:cards")]])
+            await q.edit_message_text(text="⌨️ Escribe nuevamente los 4 dígitos de la tarjeta:", reply_markup=kb)
+
         elif action == "confirm_delete":
             if db_delete_user_card(card_id):
                 await q.answer("Tarjeta eliminada")
@@ -489,19 +518,37 @@ class GmailWatcherPython:
         await context.bot.send_message(chat_id=chat_id, text="💳 Ingresa los últimos 4 dígitos de la tarjeta:")
 
     async def _cmd_puntos(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_chat.id
         total_points = calculate_total_points()
         usd_equiv = points_to_usd(total_points)
-        chat_id = update.effective_chat.id
+        
+        cards = db_get_user_cards(chat_id)
+        kb_rows = []
+        for c in cards:
+            label = f"💳 {c['card']}"
+            if c['alias']:
+                label += f" ({c['alias']})"
+            kb_rows.append([InlineKeyboardButton(label, callback_data=f"card:query_points:{c['card']}")])
+            
+        kb_rows.append([InlineKeyboardButton("🔙 Menú Principal", callback_data="menu:start")])
+        kb = InlineKeyboardMarkup(kb_rows)
+        
         self._pending_card_query.add(chat_id)
-        await context.bot.send_message(chat_id=chat_id, text=f"Total puntos: {int(total_points)} | Equivalente: ${usd_equiv}\nIngresa los últimos 4 dígitos de la tarjeta")
+        msg = (
+            f"Total Puntos Globales: {int(total_points)} | ${usd_equiv}\n\n"
+            "Selecciona una tarjeta para ver sus puntos o escribe los 4 dígitos:"
+        )
+        await context.bot.send_message(chat_id=chat_id, text=msg, reply_markup=kb)
 
     async def _on_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         chat_id = update.effective_chat.id
         text = (update.message.text or "").strip()
 
-        # Handle Points Action (Add/Redeem)
+        # Handle Points Action (Add/Redeem/AddCard/EditCard)
         if chat_id in self._pending_points_action:
             state = self._pending_points_action[chat_id]
+            
+            # --- Gestión de Puntos (Add/Redeem) ---
             if state["step"] == "card":
                 m = re.search(r"\b(\d{4})\b", text)
                 if not m:
@@ -511,6 +558,8 @@ class GmailWatcherPython:
                 state["step"] = "amount"
                 action_text = "agregar" if state["action"] == "add" else "canjear"
                 await context.bot.send_message(chat_id=chat_id, text=f"💰 Ingresa la cantidad de puntos a {action_text}:")
+                return
+
             elif state["step"] == "amount":
                 try:
                     points = int(text)
@@ -540,38 +589,51 @@ class GmailWatcherPython:
                     del self._pending_points_action[chat_id]
                 except ValueError:
                     await context.bot.send_message(chat_id=chat_id, text="❌ Ingresa un número entero válido mayor a 0.")
-            return
+                return
 
-        if chat_id in self._pending_points_action:
-             state = self._pending_points_action[chat_id]
-             if state["action"] == "add_card" and state["step"] == "card_number":
-                 m = re.search(r"\b(\d{4})\b", text)
-                 kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Volver a Tarjetas", callback_data="menu:cards")]])
-                 if not m:
-                     await context.bot.send_message(chat_id=chat_id, text="❌ Por favor, envía 4 dígitos válidos.", reply_markup=kb)
-                     return
-                 card = m.group(1)
-                 if db_add_user_card(chat_id, card):
-                     await context.bot.send_message(chat_id=chat_id, text=f"✅ Tarjeta {card} guardada correctamente.", reply_markup=kb)
-                 else:
-                     await context.bot.send_message(chat_id=chat_id, text=f"❌ Error: La tarjeta ya existe o hubo un problema.", reply_markup=kb)
-                 del self._pending_points_action[chat_id]
-                 return
-             
-             if state["action"] == "edit_card" and state["step"] == "new_number":
-                 m = re.search(r"\b(\d{4})\b", text)
-                 kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Volver a Tarjetas", callback_data="menu:cards")]])
-                 if not m:
-                     await context.bot.send_message(chat_id=chat_id, text="❌ Por favor, envía 4 dígitos válidos.", reply_markup=kb)
-                     return
-                 new_card = m.group(1)
-                 card_id = state["data"]["id"]
-                 if db_update_user_card(card_id, new_card):
-                     await context.bot.send_message(chat_id=chat_id, text=f"✅ Tarjeta actualizada a {new_card}.", reply_markup=kb)
-                 else:
-                     await context.bot.send_message(chat_id=chat_id, text="❌ Error al actualizar tarjeta.", reply_markup=kb)
-                 del self._pending_points_action[chat_id]
-                 return
+            # --- Gestión de Tarjetas (Add/Edit) ---
+            elif state["action"] == "add_card" and state["step"] == "card_number":
+                m = re.search(r"(\d{4})", text)
+                kb_cancel = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Volver a Tarjetas", callback_data="menu:cards")]])
+                
+                if not m:
+                    await context.bot.send_message(chat_id=chat_id, text="❌ No detecté 4 dígitos. Por favor, escribe solo los últimos 4 números de la tarjeta.", reply_markup=kb_cancel)
+                    return
+                
+                card = m.group(1)
+                # Ask for confirmation
+                kb_confirm = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ Sí, Guardar", callback_data=f"card:save_new:{card}")],
+                    [InlineKeyboardButton("🔄 No, Corregir", callback_data="card:retry_add:0")],
+                    [InlineKeyboardButton("❌ Cancelar", callback_data="menu:cards")]
+                ])
+                await context.bot.send_message(
+                    chat_id=chat_id, 
+                    text=f"¿Los dígitos **{card}** son correctos?", 
+                    reply_markup=kb_confirm,
+                    parse_mode="Markdown"
+                )
+                return
+            
+            elif state["action"] == "edit_card" and state["step"] == "new_number":
+                m = re.search(r"\b(\d{4})\b", text)
+                kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Volver a Tarjetas", callback_data="menu:cards")]])
+                if not m:
+                    await context.bot.send_message(chat_id=chat_id, text="❌ Por favor, envía 4 dígitos válidos.", reply_markup=kb)
+                    return
+                new_card = m.group(1)
+                card_id = state["data"]["id"]
+                if db_update_user_card(card_id, new_card):
+                    await context.bot.send_message(chat_id=chat_id, text=f"✅ Tarjeta actualizada a {new_card}.")
+                    await self._cmd_list_cards(update, context)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text="❌ Error al actualizar tarjeta.", reply_markup=kb)
+                del self._pending_points_action[chat_id]
+                return
+            
+            # Si no coincide con ningún paso conocido, eliminamos el estado para evitar bloqueos
+            del self._pending_points_action[chat_id]
+            return
 
         if chat_id not in self._pending_card_query:
             # Si no estamos esperando un dato, mostramos el menú
@@ -601,8 +663,8 @@ class GmailWatcherPython:
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("💰 Mis Puntos", callback_data="menu:puntos")],
             [InlineKeyboardButton("📜 Historial Reciente", callback_data="menu:historial")],
-            [InlineKeyboardButton("� Mis Tarjetas", callback_data="menu:cards")],
-            [InlineKeyboardButton("�� Resumen Mensual", callback_data="menu:resumen")],
+            [InlineKeyboardButton("💳 Mis Tarjetas", callback_data="menu:cards")],
+            [InlineKeyboardButton("📜 Resumen Mensual", callback_data="menu:resumen")],
             [InlineKeyboardButton("📧 Reporte Email", callback_data="menu:email_report")],
             [InlineKeyboardButton("⚙️ Gestión Puntos", callback_data="menu:gestionar")],
             [InlineKeyboardButton("❓ Ayuda", callback_data="menu:ayuda")],
@@ -622,11 +684,11 @@ class GmailWatcherPython:
 
     def _help_text(self) -> str:
         return (
-            "🤖 *Ayuda del Bot*\n\n"
-            "💰 *Mis Puntos*: Consulta puntos acumulados por tarjeta.\n"
-            "📜 *Historial*: Ver y validar tus últimas transacciones.\n"
-            "📊 *Resumen*: Reporte mensual de actividad.\n"
-            "✅ *Validación*: Marca transacciones como reconocidas/no reconocidas."
+            "🤖 Ayuda del Bot\n\n"
+            "💰 Mis Puntos: Consulta puntos acumulados por tarjeta.\n"
+            "📜 Historial: Ver y validar tus últimas transacciones.\n"
+            "📊 Resumen: Reporte mensual de actividad.\n"
+            "✅ Validación: Marca transacciones como reconocidas/no reconocidas."
         )
 
     async def _cmd_resumen(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1092,13 +1154,17 @@ def db_trigger_summary_job() -> Tuple[bool, str]:
         return False, "Error de conexión"
     try:
         cur = conn.cursor()
-        # Verificar si existe el job
-        cur.execute("SELECT job_id FROM msdb.dbo.sysjobs WHERE name = 'Enviar resumen mensual puntos'")
+        # Verificar si existe el job "Enviar resumen mensual puntos" (Usuario) o "GlobalPointsMonthlySummary" (Bot)
+        job_name = 'Enviar resumen mensual puntos'
+        cur.execute("SELECT job_id FROM msdb.dbo.sysjobs WHERE name = ?", job_name)
         if not cur.fetchone():
-            return False, "El Job 'Enviar resumen mensual puntos' no existe."
+            job_name = 'GlobalPointsMonthlySummary'
+            cur.execute("SELECT job_id FROM msdb.dbo.sysjobs WHERE name = ?", job_name)
+            if not cur.fetchone():
+                return False, "No se encontró ningún Job de resumen mensual configurado."
             
-        cur.execute("EXEC msdb.dbo.sp_start_job @job_name = N'Enviar resumen mensual puntos'")
-        return True, "Job iniciado correctamente."
+        cur.execute("EXEC msdb.dbo.sp_start_job @job_name = ?", job_name)
+        return True, f"Job '{job_name}' iniciado correctamente."
     except Exception as e:
         return False, str(e)
     finally:

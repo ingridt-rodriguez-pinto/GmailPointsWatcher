@@ -39,14 +39,6 @@ CREATE TABLE dbo.AppUsers (
 );
 GO
 
-IF OBJECT_ID('dbo.Comercios', 'U') IS NULL
-CREATE TABLE dbo.Comercios (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    [Name] NVARCHAR(200) NOT NULL UNIQUE, 
-    Categoriq NVARCHAR(50) DEFAULT 'General'
-);
-GO
-
 -- Tabla de credenciales de correo (usuario + contraseña encriptada)
 IF OBJECT_ID('dbo.EmailCredentials', 'U') IS NULL
 CREATE TABLE dbo.EmailCredentials (
@@ -58,6 +50,28 @@ CREATE TABLE dbo.EmailCredentials (
     CONSTRAINT FK_Email_User FOREIGN KEY (AppUserId) REFERENCES dbo.AppUsers(UserId),
     CONSTRAINT UQ_Email UNIQUE(Email),
     CONSTRAINT UQ_AppUserId UNIQUE(AppUserId), 
+);
+GO
+
+-- Tabla de Categorías (Transporte, Comida, Servicios...)
+IF OBJECT_ID('dbo.Categories', 'U') IS NULL
+CREATE TABLE dbo.Categories (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Name NVARCHAR(50) NOT NULL UNIQUE
+);
+
+IF NOT EXISTS (SELECT 1 FROM dbo.Categories WHERE Name = 'General')
+BEGIN
+    INSERT INTO dbo.Categories (Name) VALUES ('General');
+END
+
+IF OBJECT_ID('dbo.Comercio', 'U') IS NULL
+CREATE TABLE dbo.Comercio (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    [Name] NVARCHAR(200) NOT NULL UNIQUE, 
+    CategoryId INT NOT NULL DEFAULT 1, 
+
+    CONSTRAINT FK_Comercio_Categories FOREIGN KEY (CategoryId) REFERENCES dbo.Categories(Id)
 );
 GO
 
@@ -76,6 +90,20 @@ CREATE TABLE dbo.UserCards (
 );
 GO
 
+IF OBJECT_ID('dbo.ComercioReglaUsuario', 'U') IS NULL
+CREATE TABLE dbo.ComercioReglaUsuario (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    ComercioId INT NOT NULL,
+    UserCardId INT NOT NULL,
+    Multiplicador DECIMAL(4,2) NOT NULL DEFAULT 1.0,
+    LastUpdated DATETIME2(0) DEFAULT SYSUTCDATETIME(),
+    
+    CONSTRAINT FK_Rule_Comercio FOREIGN KEY (ComercioId) REFERENCES dbo.Comercio(Id),
+    CONSTRAINT FK_Rule_Card FOREIGN KEY (UserCardId) REFERENCES dbo.UserCards(Id),
+    CONSTRAINT UQ_Comercio_Card UNIQUE (ComercioId, UserCardId) 
+);
+GO
+
 -- Tabla de transacciones
 IF OBJECT_ID('dbo.Transactions', 'U') IS NULL
 CREATE TABLE dbo.Transactions (
@@ -85,6 +113,7 @@ CREATE TABLE dbo.Transactions (
     CardLast4     CHAR(4)       NOT NULL,
     AmountUSD     DECIMAL(12,2) NOT NULL,
     Points        INT           NOT NULL,
+	Multiplicador DECIMAL(4,2) NULL,
     TransactionAt DATETIME2(0)  NOT NULL,
     CreatedAt     DATETIME2(0)  NOT NULL DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_Trans_Card FOREIGN KEY (UserCardId) REFERENCES dbo.UserCards(Id),
@@ -92,7 +121,7 @@ CREATE TABLE dbo.Transactions (
 );
 
 CREATE INDEX IX_Transactions_TransactionAt ON dbo.Transactions(TransactionAt);
-CREATE INDEX IX_Transactions_CompanyMonth ON dbo.Transactions(Company, TransactionAt);
+CREATE INDEX IX_Transactions_ComercioMonth ON dbo.Transactions(ComercioId, TransactionAt);
 CREATE INDEX IX_Transactions_CardLast4Month ON dbo.Transactions(CardLast4, TransactionAt);
 GO
 
@@ -119,35 +148,41 @@ GO
 -- Procedimiento para Registrar/Login
 CREATE OR ALTER PROCEDURE dbo.sp_RegisterUser
     @ChatId BIGINT,
-    @Username NVARCHAR(100),
-    @FirstName NVARCHAR(100),
-    @AccessCode NVARCHAR(50)
+    @FirstName NVARCHAR(100)
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Verificar si ya existe
+    DECLARE @UserId INT;
+
     IF EXISTS (SELECT 1 FROM dbo.AppUsers WHERE TelegramChatId = @ChatId)
     BEGIN
-        -- Si existe, actualizamos datos por si cambió de nombre
+        -- A) EL USUARIO YA EXISTE: Actualizamos sus datos (por si cambió de nombre)
         UPDATE dbo.AppUsers 
-        SET Username = @Username, FirstName = @FirstName, IsActive = 1
+        SET FirstName = @FirstName, 
+            IsActive = 1
         WHERE TelegramChatId = @ChatId;
-        
-        SELECT 'EXISTING_USER' as Result;
+
+        -- Recuperamos su ID
+        SELECT @UserId = UserId FROM dbo.AppUsers WHERE TelegramChatId = @ChatId;
+
+        SELECT 'EXISTING_USER' AS Status, @UserId AS UserId;
     END
     ELSE
     BEGIN
-        -- Si no existe, lo creamos (O podrías pedir un password antes de hacer esto)
-        INSERT INTO dbo.AppUsers (TelegramChatId, Username, FirstName)
-        VALUES (@ChatId, @Username, @FirstName);
-        
-        SELECT 'NEW_USER' as Result;
+        -- B) EL USUARIO ES NUEVO: Lo insertamos
+        INSERT INTO dbo.AppUsers (TelegramChatId, FirstName)
+        VALUES (@ChatId, @FirstName);
+
+        -- Recuperamos el ID recién creado
+        SET @UserId = SCOPE_IDENTITY();
+
+        SELECT 'NEW_USER' AS Status, @UserId AS UserId;
     END
 END;
 GO
 
--- Procedimiento para insertar credenciales (encripta la contrase�a)
+-- Procedimiento para insertar credenciales (encripta la contraseña)
 CREATE OR ALTER PROCEDURE dbo.sp_SaveEmailCredential
     @Email NVARCHAR(256),
     @PlainPassword NVARCHAR(4000)
@@ -162,7 +197,7 @@ BEGIN
     USING (SELECT @Email AS Email) AS src
     ON target.Email = src.Email
     WHEN MATCHED THEN
-        UPDATE SET PasswordEncrypted = @Enc, CreatedAt = SYSUTCDATETIME()
+        UPDATE SET PasswordEncrypted = @Enc, UpdatedAt = SYSUTCDATETIME()
     WHEN NOT MATCHED THEN
         INSERT (Email, PasswordEncrypted) VALUES (@Email, @Enc);
 
@@ -170,22 +205,139 @@ BEGIN
 END;
 GO
 
--- 6) Procedimiento para insertar transacci�n (opcional para uso desde aplicaciones)
-CREATE OR ALTER PROCEDURE dbo.sp_InsertTransaction
-    @Company NVARCHAR(200),
-    @Bank NVARCHAR(100),
+-- Procedimiento para insertar transacción 
+CREATE OR ALTER PROCEDURE dbo.sp_InsertTransactionFromEmail
+    @RawComercioTexto NVARCHAR(200),
     @CardLast4 CHAR(4),
     @AmountUSD DECIMAL(12,2),
-    @Points INT,
-    @TransactionAt DATETIME2(0)
+    -- Salidas para Bot
+    @TransactionId INT OUTPUT,
+    @BotAction VARCHAR(20) OUTPUT, -- 'AUTO', 'ASK_MULT', 'ASK_CAT', 'ASK_BOTH'
+    @MessageText NVARCHAR(MAX) OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
-    INSERT INTO dbo.Transactions (Company, Bank, CardLast4, AmountUSD, Points, TransactionAt)
-    VALUES (@Company, @Bank, @CardLast4, @AmountUSD, @Points, @TransactionAt);
+    DECLARE @ComercioId INT, @UserCardId INT, @CategoryId INT;
+    DECLARE @StoredMultiplier DECIMAL(4,2);
+    DECLARE @RawComercioLimpio NVARCHAR(200) = LTRIM(RTRIM(@RawComercioTexto));
+    DECLARE @Points INT;
+
+    BEGIN TRANSACTION;
+
+    -- 1. Gestionar Comercio
+    SELECT @ComercioId = Id, @CategoryId = CategoryId FROM dbo.Comercio WHERE Name = @RawComercioLimpio;
+
+    IF @ComercioId IS NULL
+    BEGIN
+        INSERT INTO dbo.Comercio (Name) VALUES (@RawComercioLimpio);
+        SET @ComercioId = SCOPE_IDENTITY();
+    END
+
+    -- 2. Gestionar Tarjeta
+    SELECT TOP 1 @UserCardId = Id FROM dbo.UserCards WHERE CardLast4 = @CardLast4;
+    IF @UserCardId IS NULL THROW 51000, 'Tarjeta no encontrada', 1;
+
+    -- 3. Buscar regla de acumulación
+    SELECT @StoredMultiplier = Multiplicador
+    FROM dbo.ComercioReglaUsuario
+    WHERE ComercioId = @ComercioId AND UserCardId = @UserCardId;
+
+    -- 4. Lógica
+    IF @StoredMultiplier IS NOT NULL
+    BEGIN
+        --- ESCENARIO: AUTOMÁTICO ---
+        SET @Points = CAST((@AmountUSD * @StoredMultiplier) AS INT);
+        
+        INSERT INTO dbo.Transactions (UserCardId, ComercioId, CardLast4, AmountUSD, Points, TransactionAt, Multiplicador)
+        VALUES (@UserCardId, @ComercioId, @CardLast4, @AmountUSD, @Points, SYSUTCDATETIME(), @StoredMultiplier);
+        
+        SET @TransactionId = SCOPE_IDENTITY();
+        
+        -- Verificar si nos falta la categoría para los reportes
+        IF @CategoryId IS NULL
+        BEGIN
+            SET @BotAction = 'ASK_CAT'; -- Ya tengo los puntos, pero dime qué es para el Reporte
+            SET @MessageText = CONCAT('✅ ', @Points, ' pts agregados (x', @StoredMultiplier, '). Pero, ¿qué categoría es ', @RawComercioLimpio, '?');
+        END
+        ELSE
+        BEGIN
+            SET @BotAction = 'AUTO'; -- Todo perfecto
+            SET @MessageText = CONCAT('✅ ', @Points, ' pts agregados en ', @RawComercioLimpio, ' (x', @StoredMultiplier, ').');
+        END
+    END
+    ELSE
+    BEGIN
+        --- ESCENARIO: NUEVO / MANUAL ---
+        -- Insertamos pendiente (0 puntos)
+        INSERT INTO dbo.Transactions (UserCardId, ComercioId, CardLast4, AmountUSD, Points, TransactionAt)
+        VALUES (@UserCardId, @ComercioId, @CardLast4, @AmountUSD, 0, SYSUTCDATETIME());
+        
+        SET @TransactionId = SCOPE_IDENTITY();
+        
+        IF @CategoryId IS NULL
+             SET @BotAction = 'ASK_BOTH'; -- No sé ni puntos ni categoría
+        ELSE
+             SET @BotAction = 'ASK_MULT'; -- Sé la categoría, pero no sé cuántos puntos da esta transacción
+             
+        SET @MessageText = CONCAT('❓ Nueva compra en ', @RawComercioLimpio, ' ($', @AmountUSD, '). Configuración requerida.');
+    END
+
+    COMMIT TRANSACTION;
 END;
 GO
 
+CREATE OR ALTER PROCEDURE sp_CompletarConfiguracion
+    @TransactionId INT,
+    @SelectedMultiplier DECIMAL(4,2), -- NULL si solo estamos actualizando categoría
+    @SelectedCategoryName NVARCHAR(50) -- NULL si ya la teníamos
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @ComercioId INT, @UserCardId INT, @AmountUSD DECIMAL(12,2);
+    DECLARE @NewCategoryId INT;
+
+    BEGIN TRANSACTION;
+
+    SELECT @ComercioId = ComercioId, @UserCardId = UserCardId, @AmountUSD = AmountUSD
+    FROM dbo.Transactions WHERE Id = @TransactionId;
+
+    -- 1. Actualizar Categoría (Si el usuario la envió)
+    IF @SelectedCategoryName IS NOT NULL
+    BEGIN
+        -- Buscar o Crear Categoría
+        SELECT @NewCategoryId = Id FROM dbo.Categories WHERE Name = @SelectedCategoryName;
+        IF @NewCategoryId IS NULL
+        BEGIN
+            INSERT INTO dbo.Categories (Name) VALUES (@SelectedCategoryName);
+            SET @NewCategoryId = SCOPE_IDENTITY();
+        END
+
+        UPDATE dbo.Comercio SET CategoryId = @NewCategoryId WHERE Id = @ComercioId;
+    END
+
+    -- 2. Actualizar Puntos y Regla (Si el usuario envió multiplicador)
+    IF @SelectedMultiplier IS NOT NULL
+    BEGIN
+        -- 1. Actualizar Transacción Actual
+        UPDATE dbo.Transactions
+        SET Multiplicador = @SelectedMultiplier,
+            Points = CAST((AmountUSD * @SelectedMultiplier) AS INT)
+        WHERE Id = @TransactionId;
+
+        MERGE dbo.ComercioReglaUsuario AS target
+        USING (SELECT @ComercioId AS CId, @UserCardId AS UId) AS source
+        ON (target.ComercioId = source.CId AND target.UserCardId = source.UId)
+        WHEN MATCHED THEN
+            UPDATE SET Multiplicador = @SelectedMultiplier, LastUpdated = SYSUTCDATETIME()
+        WHEN NOT MATCHED THEN
+            INSERT (ComercioId, UserCardId, Multiplicador)
+            VALUES (@ComercioId, @UserCardId, @SelectedMultiplier);
+
+    END
+
+    COMMIT TRANSACTION;
+END;
+GO
 -- 7) Resumen mensual por tarjeta
 CREATE OR ALTER PROCEDURE dbo.sp_MonthlyPointsSummary
     @Year INT,
@@ -194,22 +346,40 @@ CREATE OR ALTER PROCEDURE dbo.sp_MonthlyPointsSummary
 AS
 BEGIN
     SET NOCOUNT ON;
+    DECLARE @StartDate DATETIME2(0) = DATEFROMPARTS(@Year, @Month, 1);
+    DECLARE @EndDate DATETIME2(0) = DATEADD(MONTH, 1, @StartDate);
 
-    ;WITH Monthly AS (
-        SELECT *
-        FROM dbo.Transactions
-        WHERE YEAR(TransactionAt) = @Year
-          AND MONTH(TransactionAt) = @Month
-          AND CardLast4 = @CardLast4
+    -- Usamos una CTE para filtrar primero
+    ;WITH MonthlyData AS (
+        SELECT 
+            t.AmountUSD, 
+            t.Points, 
+            t.ComercioId
+        FROM dbo.Transactions t
+        INNER JOIN dbo.UserCards c ON t.UserCardId = c.Id
+        WHERE t.TransactionAt >= @StartDate 
+          AND t.TransactionAt < @EndDate
+          AND c.CardLast4 = @CardLast4
     )
     SELECT
-        SUM(Points) AS TotalPoints,
-        SUM(AmountUSD) AS TotalAmountUSD,
-        (SELECT TOP 1 Company
-         FROM Monthly
-         GROUP BY Company
-         ORDER BY COUNT(*) DESC, SUM(AmountUSD) DESC) AS TopCompany
-    FROM Monthly;
+        ISNULL(SUM(AmountUSD), 0.00) AS TotalAmountUSD,
+        ISNULL(SUM(Points), 0) AS TotalPoints,
+        (
+            SELECT TOP 1 C.Name
+            FROM MonthlyData md
+            INNER JOIN dbo.Comercio C ON md.ComercioId = C.Id
+            GROUP BY C.Name
+            ORDER BY COUNT(*) DESC, SUM(md.AmountUSD) DESC
+        ) AS TopComercio, -- El NOMBRE del comercio más frecuente
+        (
+            SELECT TOP 1 Cat.Name
+            FROM MonthlyData md
+            INNER JOIN dbo.Comercio C ON md.ComercioId = C.Id
+            LEFT JOIN dbo.Categories Cat ON C.CategoryId = Cat.Id
+            GROUP BY Cat.Name
+            ORDER BY SUM(md.AmountUSD) DESC
+        ) AS TopCategory -- Nombre de la categoría donde más gastaste
+    FROM MonthlyData;
 END;
 GO
 
@@ -232,10 +402,11 @@ BEGIN
 
     SELECT @TotalPoints = SUM(Points),
            @TotalAmount = SUM(AmountUSD),
-           @TopCompany = (SELECT TOP 1 Company
-                          FROM dbo.Transactions
+           @TopCompany = (SELECT TOP 1 b.Name Compania
+                          FROM dbo.Transactions a
+						  JOIN dbo.Comercio b on a.ComercioId = b.Id
                           WHERE YEAR(TransactionAt) = @Year AND MONTH(TransactionAt) = @Month AND CardLast4 = @CardLast4
-                          GROUP BY Company
+                          GROUP BY b.Name
                           ORDER BY COUNT(*) DESC, SUM(AmountUSD) DESC)
     FROM dbo.Transactions
     WHERE YEAR(TransactionAt) = @Year AND MONTH(TransactionAt) = @Month AND CardLast4 = @CardLast4;

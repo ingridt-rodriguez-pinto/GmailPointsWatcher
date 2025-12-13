@@ -39,12 +39,25 @@ CREATE TABLE dbo.AppUsers (
 );
 GO
 
--- Tabla de credenciales de correo (usuario + contrase�a encriptada)
+IF OBJECT_ID('dbo.Comercios', 'U') IS NULL
+CREATE TABLE dbo.Comercios (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    [Name] NVARCHAR(200) NOT NULL UNIQUE, 
+    Categoriq NVARCHAR(50) DEFAULT 'General'
+);
+GO
+
+-- Tabla de credenciales de correo (usuario + contraseña encriptada)
+IF OBJECT_ID('dbo.EmailCredentials', 'U') IS NULL
 CREATE TABLE dbo.EmailCredentials (
     Id               INT IDENTITY(1,1) PRIMARY KEY,
+    AppUserId INT NOT NULL,
     Email            NVARCHAR(256) NOT NULL UNIQUE,
     PasswordEncrypted VARBINARY(MAX) NOT NULL,
-    CreatedAt        DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
+    UpdatedAt        DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_Email_User FOREIGN KEY (AppUserId) REFERENCES dbo.AppUsers(UserId),
+    CONSTRAINT UQ_Email UNIQUE(Email),
+    CONSTRAINT UQ_AppUserId UNIQUE(AppUserId), 
 );
 GO
 
@@ -55,10 +68,11 @@ CREATE TABLE dbo.UserCards (
     AppUserId INT NOT NULL,
     ChatId BIGINT NOT NULL,
     CardLast4 CHAR(4) NOT NULL,
+    Bank  NVARCHAR(100) NOT NULL,
     Alias NVARCHAR(50) NULL,
     CreatedAt DATETIME DEFAULT GETDATE(),
-    CONSTRAINT FK_UserCards_AppUsers FOREIGN KEY (AppUserId) REFERENCES dbo.AppUsers(UserId),
-    CONSTRAINT UQ_Chat_Card UNIQUE(ChatId, CardLast4)
+    CONSTRAINT FK_UserCards_Users FOREIGN KEY (AppUserId) REFERENCES dbo.AppUsers(UserId),
+    CONSTRAINT UQ_Chat_Card UNIQUE(AppUserId, CardLast4)
 );
 GO
 
@@ -66,13 +80,15 @@ GO
 IF OBJECT_ID('dbo.Transactions', 'U') IS NULL
 CREATE TABLE dbo.Transactions (
     Id            BIGINT IDENTITY(1,1) PRIMARY KEY,
-    Company       NVARCHAR(200) NOT NULL,
-    Bank          NVARCHAR(100) NOT NULL,
+    UserCardId INT NOT NULL,
+    ComercioId INT NOT NULL,
     CardLast4     CHAR(4)       NOT NULL,
     AmountUSD     DECIMAL(12,2) NOT NULL,
     Points        INT           NOT NULL,
     TransactionAt DATETIME2(0)  NOT NULL,
-    CreatedAt     DATETIME2(0)  NOT NULL DEFAULT SYSUTCDATETIME()
+    CreatedAt     DATETIME2(0)  NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_Trans_Card FOREIGN KEY (UserCardId) REFERENCES dbo.UserCards(Id),
+    CONSTRAINT FK_Trans_Comercio FOREIGN KEY (ComercioId) REFERENCES dbo.Comercio(Id)
 );
 
 CREATE INDEX IX_Transactions_TransactionAt ON dbo.Transactions(TransactionAt);
@@ -85,7 +101,7 @@ IF OBJECT_ID('dbo.AuditoriaValidaciones', 'U') IS NULL
 CREATE TABLE dbo.AuditoriaValidaciones (
     Id INT IDENTITY(1,1) PRIMARY KEY,
     TokenAuditoria NVARCHAR(128),
-    Estado NVARCHAR(20) NOT NULL, -- 'RECONOCIDA' / 'NO RECONOCIDA'
+    Estado NVARCHAR(20) NOT NULL CHECK (Estado IN ('RECONOCIDA', 'NO RECONOCIDA')),
     FechaValidacion DATETIME DEFAULT GETDATE()
 );
 GO
@@ -101,10 +117,11 @@ CREATE TABLE dbo.ErrorLog (
 GO
 
 -- Procedimiento para Registrar/Login
-CREATE OR ALTER PROCEDURE dbo.sp_LoginOrRegisterUser
+CREATE OR ALTER PROCEDURE dbo.sp_RegisterUser
     @ChatId BIGINT,
     @Username NVARCHAR(100),
-    @FirstName NVARCHAR(100)
+    @FirstName NVARCHAR(100),
+    @AccessCode NVARCHAR(50)
 AS
 BEGIN
     SET NOCOUNT ON;

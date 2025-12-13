@@ -80,7 +80,6 @@ IF OBJECT_ID('dbo.UserCards', 'U') IS NULL
 CREATE TABLE dbo.UserCards (
     Id INT IDENTITY(1,1) PRIMARY KEY,
     AppUserId INT NOT NULL,
-    ChatId BIGINT NOT NULL,
     CardLast4 CHAR(4) NOT NULL,
     Bank  NVARCHAR(100) NOT NULL,
     Alias NVARCHAR(50) NULL,

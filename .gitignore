@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+
+# Logs y Bases de Datos Locales
+logs/
+*.log
+
+# Archivos de Entorno y Credenciales
+.env

@@ -410,51 +410,136 @@ BEGIN
 END;
 GO
 
---
-
-
--- 7) Resumen mensual por tarjeta
-CREATE OR ALTER PROCEDURE dbo.sp_MonthlyPointsSummary
-    @Year INT,
-    @Month INT,
-    @CardLast4 CHAR(4)
+-- Registro de chat /usuario
+CREATE OR ALTER PROCEDURE dbo.sp_RegisterUserCredentials
+    @TelegramChatId BIGINT,
+    @Email NVARCHAR(256),
+    @RawPassword NVARCHAR(MAX) -- Contraseña plana desde Telegram
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @StartDate DATETIME2(0) = DATEFROMPARTS(@Year, @Month, 1);
-    DECLARE @EndDate DATETIME2(0) = DATEADD(MONTH, 1, @StartDate);
+    DECLARE @UserId INT;
 
-    -- Usamos una CTE para filtrar primero
-    ;WITH MonthlyData AS (
-        SELECT 
-            t.AmountUSD, 
-            t.Points, 
-            t.ComercioId
-        FROM dbo.Transactions t
-        INNER JOIN dbo.UserCards c ON t.UserCardId = c.Id
-        WHERE t.TransactionAt >= @StartDate 
-          AND t.TransactionAt < @EndDate
-          AND c.CardLast4 = @CardLast4
-    )
-    SELECT
-        ISNULL(SUM(AmountUSD), 0.00) AS TotalAmountUSD,
-        ISNULL(SUM(Points), 0) AS TotalPoints,
-        (
-            SELECT TOP 1 C.Name
-            FROM MonthlyData md
-            INNER JOIN dbo.Comercio C ON md.ComercioId = C.Id
-            GROUP BY C.Name
-            ORDER BY COUNT(*) DESC, SUM(md.AmountUSD) DESC
-        ) AS TopComercio, -- El NOMBRE del comercio más frecuente
-        (
-            SELECT TOP 1 Cat.Name
-            FROM MonthlyData md
-            INNER JOIN dbo.Comercio C ON md.ComercioId = C.Id
-            LEFT JOIN dbo.Categories Cat ON C.CategoryId = Cat.Id
-            GROUP BY Cat.Name
-            ORDER BY SUM(md.AmountUSD) DESC
-        ) AS TopCategory -- Nombre de la categoría donde más gastaste
-    FROM MonthlyData;
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- 1. Buscar o Crear el Usuario
+        SELECT @UserId = UserId 
+        FROM dbo.AppUsers 
+        WHERE TelegramChatId = @TelegramChatId;
+
+        IF @UserId IS NULL
+        BEGIN
+            INSERT INTO dbo.AppUsers (TelegramChatId, FirstName) 
+            VALUES (@TelegramChatId, 'Nuevo Usuario');
+            
+            SET @UserId = SCOPE_IDENTITY();
+        END
+
+        -- 2. Guardar Credenciales con Encriptación
+        -- Abrimos la llave maestra para poder usar la llave simétrica
+        OPEN SYMMETRIC KEY EmailCredsKey DECRYPTION BY CERTIFICATE EmailCredsCert;
+
+        -- Determinar si se agrega o actualiza
+        IF EXISTS (SELECT 1 FROM dbo.EmailCredentials WHERE AppUserId = @UserId)
+        BEGIN
+            UPDATE dbo.EmailCredentials
+            SET Email = @Email,
+                PasswordEncrypted = EncryptByKey(Key_GUID('EmailCredsKey'), @RawPassword),
+                UpdatedAt = SYSUTCDATETIME()
+            WHERE AppUserId = @UserId;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO dbo.EmailCredentials (AppUserId, Email, PasswordEncrypted)
+            VALUES (
+                @UserId, 
+                @Email, 
+                EncryptByKey(Key_GUID('EmailCredsKey'), @RawPassword)
+            );
+        END
+
+        -- Cerramos la llave por seguridad
+        CLOSE SYMMETRIC KEY EmailCredsKey;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        IF EXISTS (SELECT * FROM sys.openkeys WHERE key_name = 'EmailCredsKey')
+            CLOSE SYMMETRIC KEY EmailCredsKey;
+
+        INSERT INTO dbo.ErrorLog (ErrorMessage, StoredProcedure)
+        VALUES (
+            ERROR_MESSAGE(),
+            ISNULL(ERROR_PROCEDURE(), 'sp_RegisterUserCredentials') 
+        );
+
+        THROW;
+    END CATCH
+END;
+GO
+
+-- 7) Resumen mensual por tarjeta
+CREATE OR ALTER PROCEDURE dbo.sp_MonthlyPointsSummary
+    @TelegramChatId BIGINT,
+    @Month INT = NULL, -- NULL = Mes Actual
+    @Year INT = NULL   -- NULL = Año Actual
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Si no envían fecha, usamos la fecha actual
+    IF @Month IS NULL SET @Month = MONTH(GETDATE());
+    IF @Year IS NULL SET @Year = YEAR(GETDATE());
+
+    DECLARE @UserId INT;
+    SELECT @UserId = UserId FROM dbo.AppUsers WHERE TelegramChatId = @TelegramChatId;
+
+    -- Variables para resultados
+    DECLARE @TotalSpent DECIMAL(12,2) = 0;
+    DECLARE @TotalPoints INT = 0;
+    DECLARE @TxCount INT = 0;
+    DECLARE @TopCategory NVARCHAR(50) = 'Sin datos';
+
+    -- 1. Calcular Totales
+    SELECT 
+        @TotalSpent = ISNULL(SUM(t.AmountUSD), 0),
+        @TotalPoints = ISNULL(SUM(t.Points), 0),
+        @TxCount = COUNT(*)
+    FROM dbo.Transactions t
+    INNER JOIN dbo.UserCards c ON t.UserCardId = c.Id
+    WHERE c.AppUserId = @UserId
+      AND MONTH(t.TransactionAt) = @Month 
+      AND YEAR(t.TransactionAt) = @Year;
+
+    -- 2. Calcular Categoría Favorita
+    SELECT TOP 1 @TopCategory = cat.Name
+    FROM dbo.Transactions t
+    INNER JOIN dbo.UserCards uc ON t.UserCardId = uc.Id
+    INNER JOIN dbo.Comercio m ON t.ComercioId = m.Id
+    INNER JOIN dbo.Categories cat ON m.CategoryId = cat.Id
+    WHERE uc.AppUserId = @UserId
+      AND MONTH(t.TransactionAt) = @Month 
+      AND YEAR(t.TransactionAt) = @Year
+    GROUP BY cat.Name
+    ORDER BY SUM(t.AmountUSD) DESC;
+
+    SELECT 
+        @TotalSpent AS TotalUSD,
+        @TotalPoints AS TotalPoints,
+        @TxCount AS TxCount,
+        ISNULL(@TopCategory, 'Sin movimientos') AS TopCategory,
+        DATENAME(MONTH, DATEFROMPARTS(@Year, @Month, 1)) AS MonthName;
+END;
+GO
+
+-- Obtener todos los usuarios (Para el Job automático)
+CREATE OR ALTER PROCEDURE dbo.sp_GetAllActiveChatIds
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT TelegramChatId FROM dbo.AppUsers WHERE IsActive = 1;
 END;
 GO
 

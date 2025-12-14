@@ -19,7 +19,8 @@ IMAP_SERVER = "imap.gmail.com"
 # Lista blanca de remitentes (bancos)
 ALLOWED_SENDERS = [
     "contactenos@globalbank.com.pa",
-    "ingridt.r.pinto@gmail.com" 
+    "ingridt.r.pinto@gmail.com" ,
+    "buglione2500@gmail.com"
 ]
 
 def enviar_telegram(chat_id, mensaje, botones=None):

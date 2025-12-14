@@ -204,11 +204,76 @@ BEGIN
 END;
 GO
 
+--Obtener idTarjeta
+CREATE OR ALTER PROCEDURE dbo.sp_GetOrRegisterCard
+    @AppUserId INT,
+    @CardLast4 CHAR(4),
+    @BankName NVARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @CardId INT;
+
+    -- 1. Intentamos buscar la tarjeta
+    SELECT @CardId = Id
+    FROM dbo.UserCards
+    WHERE AppUserId = @AppUserId 
+      AND CardLast4 = @CardLast4;
+
+    -- 2. Si no existe, la creamos
+    IF @CardId IS NULL
+    BEGIN
+        -- Generamos un Alias amigable por defecto
+        DECLARE @DefaultAlias NVARCHAR(50) = CONCAT(@BankName, ' *', @CardLast4);
+
+        INSERT INTO dbo.UserCards (
+            AppUserId, 
+            CardLast4, 
+            Bank, 
+            Alias
+        )
+        VALUES (
+            @AppUserId, 
+            @CardLast4, 
+            @BankName, 
+            @DefaultAlias
+        );
+
+        SET @CardId = SCOPE_IDENTITY();
+    END
+
+    -- 3. Devolvemos el ID para que lo uses en la transacción
+    SELECT @CardId AS CardId;
+END;
+GO
+
+--Listar Tarjetas
+CREATE OR ALTER PROCEDURE dbo.sp_ListUserCards
+    @AppUserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        Id,
+        Bank,
+        CardLast4,
+        Alias,
+        FORMAT(CreatedAt, 'yyyy-MM-dd') AS FechaRegistro
+    FROM dbo.UserCards
+    WHERE AppUserId = @AppUserId
+    ORDER BY Bank ASC;
+END;
+GO
+
 -- Procedimiento para insertar transacción 
 CREATE OR ALTER PROCEDURE dbo.sp_InsertTransactionFromEmail
+    @AppUserId INT,                 -- ID del usuario (dueño del correo)
     @RawComercioTexto NVARCHAR(200),
     @CardLast4 CHAR(4),
     @AmountUSD DECIMAL(12,2),
+    @BankName NVARCHAR(100),        -- "Global Bank" (por si hay que crear la tarjeta nueva)
     -- Salidas para Bot
     @TransactionId INT OUTPUT,
     @BotAction VARCHAR(20) OUTPUT, -- 'AUTO', 'ASK_MULT', 'ASK_CAT', 'ASK_BOTH'
@@ -233,8 +298,15 @@ BEGIN
     END
 
     -- 2. Gestionar Tarjeta
-    SELECT TOP 1 @UserCardId = Id FROM dbo.UserCards WHERE CardLast4 = @CardLast4;
-    IF @UserCardId IS NULL THROW 51000, 'Tarjeta no encontrada', 1;
+    SELECT TOP 1 @UserCardId = Id FROM dbo.UserCards WHERE CardLast4 = @CardLast4 AND AppUserId = @AppUserId;
+    IF @UserCardId IS NULL
+    BEGIN
+        -- Si no existe, la creamos automática con un alias default
+        INSERT INTO dbo.UserCards (AppUserId, CardLast4, Bank, Alias)
+        VALUES (@AppUserId, @CardLast4, @BankName, CONCAT(@BankName, ' *', @CardLast4));
+        
+        SET @UserCardId = SCOPE_IDENTITY();
+    END
 
     -- 3. Buscar regla de acumulación
     SELECT @StoredMultiplier = Multiplicador
@@ -337,6 +409,10 @@ BEGIN
     COMMIT TRANSACTION;
 END;
 GO
+
+--
+
+
 -- 7) Resumen mensual por tarjeta
 CREATE OR ALTER PROCEDURE dbo.sp_MonthlyPointsSummary
     @Year INT,
@@ -511,3 +587,137 @@ EXEC sp_add_schedule
 EXEC sp_attach_schedule @job_id = @jobId, @schedule_name = N'Diario 23:59';
 EXEC sp_add_jobserver  @job_id = @jobId, @server_name = N'(local)'; -- ajusta el nombre del servidor si aplica
 GO
+
+--- PERMISOS ---
+
+USE master 
+GO
+
+--Login de servidor
+IF NOT EXISTS (SELECT name FROM sys.server_principals WHERE name = 'GlobalPointsAppUser')
+BEGIN
+    CREATE LOGIN [GlobalPointsAppUser] 
+    WITH PASSWORD = 'PointsFinal2025!', 
+    DEFAULT_DATABASE = [GlobalPointsWatcher],
+    CHECK_EXPIRATION = OFF,
+    CHECK_POLICY = ON;
+END
+GO
+
+USE GlobalPointsWatcher;
+GO
+
+-- Crear el Usuario en la Base de Datos vinculado al Login
+IF NOT EXISTS (SELECT name FROM sys.database_principals WHERE name = 'GlobalPointsAppUser')
+BEGIN
+    CREATE USER [GlobalPointsAppUser] FOR LOGIN [GlobalPointsAppUser];
+END
+GO
+
+-- A) Permiso para EJECUTAR Stored Procedures en esquema dbo
+GRANT EXECUTE ON SCHEMA::dbo TO [GlobalPointsAppUser];
+
+-- B) Permisos de Lectura y Escritura de datos
+ALTER ROLE db_datareader ADD MEMBER [GlobalPointsAppUser];
+ALTER ROLE db_datawriter ADD MEMBER [GlobalPointsAppUser];
+
+-- C) Permisos para la ENCRIPTACIÓN (leer la contraseña del correo)
+GRANT VIEW DEFINITION ON SYMMETRIC KEY::EmailCredsKey TO [GlobalPointsAppUser];
+GRANT CONTROL ON CERTIFICATE::EmailCredsCert TO [GlobalPointsAppUser]; 
+-- Nota: CONTROL sobre el certificado suele ser necesario para usarlo en desencriptación 
+GO
+
+--- PRUEBAS DE FUNCIONABILIDAD ---
+PRINT '>>> INICIANDO PRUEBAS DE FUNCIONALIDAD (CRUD) <<<';
+EXECUTE AS USER = 'GlobalPointsAppUser';
+
+SELECT CURRENT_USER AS 'Usuario_Actual_Simulado';
+
+DECLARE @UserId INT;
+DECLARE @TxId INT;
+DECLARE @Action VARCHAR(20);
+DECLARE @Msg NVARCHAR(MAX);
+
+
+-- 1. Crear Usuario Base
+PRINT '1. Creando Usuario de Prueba...';
+INSERT INTO dbo.AppUsers (TelegramChatId, FirstName) VALUES (999888777, 'Tester Ingridt');
+SET @UserId = SCOPE_IDENTITY();
+
+-- Simulamos credenciales (con password dummy en binario)
+INSERT INTO dbo.EmailCredentials (AppUserId, Email, PasswordEncrypted) 
+VALUES (@UserId, 'ingridt.rodriguez@test.com', 0x123456);
+
+IF EXISTS(SELECT 1 FROM dbo.AppUsers WHERE UserId = @UserId) PRINT '** Usuario Creado.';
+
+-- 2. Simular Transacción "Nueva"
+PRINT '2. Simulando Compra Nueva ...';
+-- Nota: No existe la tarjeta ni el comercio. El SP debe crearlos.
+EXEC  [dbo].[sp_InsertTransactionFromEmail]
+    @AppUserId = @UserId,
+    @RawComercioTexto = 'NETFLIX.COM PAYMENT',
+    @CardLast4 = '4444',
+    @BankName = 'Banco General',
+    @AmountUSD = 15.00,
+    @TransactionId = @TxId OUTPUT,
+    @BotAction = @Action OUTPUT,
+    @MessageText = @Msg OUTPUT;
+
+SELECT @Action, @Msg
+PRINT '   ** Resultado para el Bot: ' + @Msg;
+PRINT '   ** Acción: ' + @Action;
+
+-- Validación de Creaciones por esa transacción
+SELECT * FROM dbo.Comercio WHERE Name = 'NETFLIX.COM PAYMENT'
+SELECT * FROM dbo.UserCards WHERE CardLast4 = '4444'
+
+IF EXISTS(SELECT 1 FROM dbo.Comercio WHERE Name = 'NETFLIX.COM PAYMENT') PRINT '   ** Comercio creado automáticamente.';
+IF EXISTS(SELECT 1 FROM dbo.UserCards WHERE CardLast4 = '4444') PRINT '   ** Tarjeta creada automáticamente.';
+
+-- 3. UPDATE (Configurar la Regla desde el Bot)
+-- ---------------------------------------------------------
+PRINT '3. Simulando respuesta del Usuario (Configurar x2 Puntos y Categoría)...';
+-- El usuario dice que Netflix es "Servicios Digitales" y da x2 puntos.
+EXEC dbo.sp_CompletarConfiguracion 
+    @TransactionId = @TxId,
+    @SelectedMultiplier = 2.0,
+    @SelectedCategoryName = 'Servicios Digitales';
+
+-- Validar actualización
+DECLARE @Puntos INT;
+SELECT @Puntos = Points FROM dbo.Transactions WHERE Id = @TxId;
+SELECT * FROM dbo.Transactions WHERE Id = @TxId;
+SELECT * FROM dbo.Categories
+IF @Puntos = 30 PRINT '   ** Puntos actualizados correctamente (15 * 2 = 30).';
+IF EXISTS(SELECT 1 FROM dbo.Categories WHERE Name = 'Servicios Digitales') PRINT '   ** Categoría nueva creada.';
+
+
+-- 4. Segunda Compra - Debe ser automática
+PRINT '4. Simulando Segunda Compra en Netflix (Debe ser automática)...';
+EXEC  [dbo].[sp_InsertTransactionFromEmail]
+    @AppUserId = @UserId,
+    @RawComercioTexto = 'NETFLIX.COM PAYMENT', -- Mismo nombre
+    @CardLast4 = '4444',                    -- Misma tarjeta
+    @BankName = 'Banco General',
+    @AmountUSD = 10.00,
+    @TransactionId = @TxId OUTPUT,
+    @BotAction = @Action OUTPUT,
+    @MessageText = @Msg OUTPUT;
+
+PRINT '   Resultado para el Bot: ' + @Msg;
+SELECT @Action, @Msg
+
+IF @Action = 'AUTO' PRINT '   ** El sistema detectó la regla y aplicó AUTO.';
+
+-- 5. Reporte Final
+PRINT '5. Listando Transacciones del Usuario...';
+SELECT 
+    T.Id, M.Name as Comercio, T.AmountUSD, T.Points, T.Multiplicador, T.CreatedAt
+FROM dbo.Transactions T
+JOIN dbo.Comercio M ON T.ComercioId = M.Id
+JOIN dbo.UserCards C ON T.UserCardId = C.Id
+WHERE C.AppUserId = @UserId;
+
+REVERT;
+
+SELECT CURRENT_USER AS 'Usuario_Real_Restaurado';

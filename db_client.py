@@ -139,7 +139,7 @@ class GlobalPointsDB:
             """
             cursor.execute(sql, (limit, chat_id))
             rows = cursor.fetchall()
-            
+            self.log.info(rows)
             results = []
             for r in rows:
                 results.append({
@@ -147,7 +147,7 @@ class GlobalPointsDB:
                     "comercio": r.Comercio,
                     "monto": float(r.AmountUSD),
                     "puntos": r.Points,
-                    "multiplicador": float(r.Multiplier) if r.Multiplier else 1.0,
+                    "multiplicador": float(r.Multiplicador) if r.Multiplicador else 1.0,
                     "fecha": r.TransactionAt.strftime("%d/%m %H:%M")
                 })
             return results

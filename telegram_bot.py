@@ -83,7 +83,7 @@ async def receive_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def recientes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     db = GlobalPointsDB()
-    txs = db.get_recent_transactions(chat_id)
+    txs = db.get_recent_transactions(chat_id,5)
 
     if not txs:
         await update.message.reply_text("No tienes transacciones recientes.")
@@ -153,13 +153,25 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    # Data puede ser: "cfg|ID|tipo|val" O "edit|ID" O "setmult|ID|val"
     data = query.data.split("|")
     accion = data[0]
 
     db = GlobalPointsDB()
 
-    # --- Botón "Editar" ---
+    # Recuperamos el texto base del mensaje (lo que no cambia, la info de la compra)
+    texto_original = query.message.text_markdown
+    
+    # Intentamos encontrar la parte base de la transacción
+    # La buscamos hasta la primera línea de confirmación o prompt.
+    base_text_lines = []
+    for line in texto_original.split('\n'):
+        if line.startswith('✅') or line.startswith('❌') or line.startswith('👇'):
+            break
+        base_text_lines.append(line)
+    
+    base_text = '\n'.join(base_text_lines).strip()
+    
+    # --- A. EDICIÓN MANUAL (Botón "Editar") ---
     if accion == "edit":
         tx_id = data[1]
         keyboard = InlineKeyboardMarkup([
@@ -174,32 +186,76 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         ])
         await query.edit_message_text(
-            text=f"{query.message.text}\n\n**Selecciona el nuevo multiplicador:**",
+            text=f"{texto_original}\n\n👇 **Selecciona el nuevo multiplicador:**",
             reply_markup=keyboard,
             parse_mode="Markdown"
         )
 
-    # --- GUARDAR CAMBIOS (Viene de "cfg" o "setmult") ---
-    elif accion == "setmult" or (accion == "cfg" and data[2] == "mult"):
-        # Unificamos lógica: obtener ID y Valor
+    # --- B. LÓGICA SECUENCIAL DE CONFIGURACIÓN ---
+    
+    # Paso 1: GUARDAR MULTIPLICADOR y PREGUNTAR CATEGORÍA
+    elif accion == "cfg" and data[2] == "mult":
         tx_id = int(data[1])
-        valor = float(data[3]) if accion == "cfg" else float(data[2])
+        valor = float(data[3])
+        
+        # 1. Guardar el multiplicador
+        if db.complete_configuration(transaction_id=tx_id, multiplier=valor):
+            confirm_mult = f"✅ Regla: **x{valor}**"
+            
+            # 2. Generar SOLO los botones de Categoría para el siguiente paso
+            category_keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("Comida", callback_data=f"cfg|{tx_id}|cat|Comida"),
+                    InlineKeyboardButton("Transporte", callback_data=f"cfg|{tx_id}|cat|Transporte"),
+                    InlineKeyboardButton("Super", callback_data=f"cfg|{tx_id}|cat|Supermercado")
+                ],
+                [
+                    InlineKeyboardButton("Servicios", callback_data=f"cfg|{tx_id}|cat|Servicios"),
+                    InlineKeyboardButton("General", callback_data=f"cfg|{tx_id}|cat|General")
+                ]
+            ])
 
+            # 3. Editar el mensaje, mostrando el multiplicador y pidiendo la categoría
+            final_text = f"{base_text}\n\n{confirm_mult}\n\n👇 **Ahora elige la Categoría:**"
+            await query.edit_message_text(
+                text=final_text,
+                reply_markup=category_keyboard,
+                parse_mode="Markdown"
+            )
+        else:
+            await query.edit_message_text(text="❌ Error al guardar el multiplicador.", parse_mode="Markdown")
+
+    # Paso 2: GUARDAR CATEGORÍA y FINALIZAR
+    elif accion == "cfg" and data[2] == "cat":
+        tx_id = int(data[1])
+        nombre_categoria = data[3]
+        
+        # 1. Guardar la categoría
+        if db.complete_configuration(transaction_id=tx_id, category_name=nombre_categoria):
+            
+            # 2. Recuperar la línea de confirmación del Multiplicador del texto anterior
+            mult_confirmation_line = [line for line in texto_original.split('\n') if line.startswith('✅ Regla:')][0]
+            confirm_cat = f"✅ Categoría: **{nombre_categoria}**"
+            
+            # 3. Crear el mensaje final con ambas confirmaciones
+            final_text = f"{base_text}\n\n{mult_confirmation_line}\n{confirm_cat}"
+
+            await query.edit_message_text(
+                text=final_text,
+                reply_markup=None, # Quitar botones (Configuración completa)
+                parse_mode="Markdown"
+            )
+        else:
+            await query.edit_message_text(text="❌ Error al guardar la categoría.", parse_mode="Markdown")
+
+    # --- C. GUARDAR CAMBIOS (setmult en edición manual) ---
+    elif accion == "setmult":
+        tx_id = int(data[1])
+        valor = float(data[2])
         if db.complete_configuration(transaction_id=tx_id, multiplier=valor):
             await query.edit_message_text(f"✅ **Actualizado:** Ahora es x{valor}", parse_mode="Markdown")
         else:
             await query.edit_message_text("❌ Error al actualizar.")
-
-    # --- GUARDAR CATEGORÍA ---
-    elif accion == "cfg" and data[2] == "cat":
-        tx_id = int(data[1])
-        nombre_categoria = data[3]
-
-        # Llamamos a BD pasando category_name
-        if db.complete_configuration(transaction_id=tx_id, category_name=nombre_categoria):
-            await query.edit_message_text(f"Categoría asignada: **{nombre_categoria}**", parse_mode="Markdown")
-        else:
-            await query.edit_message_text("❌ Error al guardar categoría.")
 
 def main():
     if not TOKEN:

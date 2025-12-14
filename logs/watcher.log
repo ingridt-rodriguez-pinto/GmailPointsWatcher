@@ -2522,3 +2522,50 @@ telegram.error.Conflict: Conflict: terminated by other getUpdates request; make 
 2025-12-14 15:00:41 [INFO] [GmailWatcher] Login a correo existoso
 2025-12-14 15:01:27 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
 2025-12-14 15:01:28 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:02:13 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:02:14 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:02:59 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:03:00 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:15:08 [INFO] [GmailWatcher] Iniciando lector de correo...
+2025-12-14 15:15:08 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:15:09 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:15:28 [INFO] [TelegramBot] Bot de Telegram iniciado y escuchando...
+2025-12-14 15:15:54 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:15:55 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:16:18 [ERROR] [DB_Client] Error obteniendo recientes: 'pyodbc.Row' object has no attribute 'Multiplier'
+2025-12-14 15:16:41 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:16:41 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:17:27 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:17:38 [INFO] [TelegramBot] Bot de Telegram iniciado y escuchando...
+2025-12-14 15:17:48 [ERROR] [DB_Client] Error obteniendo recientes: name 'log' is not defined
+2025-12-14 15:18:36 [INFO] [TelegramBot] Bot de Telegram iniciado y escuchando...
+2025-12-14 15:18:52 [INFO] [DB_Client] [(1, 'SISTEMA DE TRANSPORTE P. Panam. PA', Decimal('1.00'), 1, Decimal('1.00'), datetime.datetime(2025, 12, 14, 19, 56, 50))]
+2025-12-14 15:18:52 [ERROR] [DB_Client] Error obteniendo recientes: 'pyodbc.Row' object has no attribute 'Multiplier'
+2025-12-14 15:19:47 [INFO] [TelegramBot] Bot de Telegram iniciado y escuchando...
+2025-12-14 15:21:19 [INFO] [DB_Client] [(1, 'SISTEMA DE TRANSPORTE P. Panam. PA', Decimal('1.00'), 1, Decimal('1.00'), datetime.datetime(2025, 12, 14, 19, 56, 50))]
+2025-12-14 15:22:19 [INFO] [GmailWatcher] Iniciando lector de correo...
+2025-12-14 15:22:19 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:22:20 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:22:20 [INFO] [GmailWatcher] [Ingridt.r.pinto@gmail.com] Detectados 1 correos nuevos.
+2025-12-14 15:22:20 [INFO] [GmailWatcher] [Ingridt.r.pinto@gmail.com] Compra: SISTEMA DE TRANSPORTE P. Panam. PA ($2.0)
+2025-12-14 15:22:55 [INFO] [DB_Client] [(2, 'SISTEMA DE TRANSPORTE P. Panam. PA', Decimal('2.00'), 2, Decimal('1.00'), datetime.datetime(2025, 12, 14, 20, 22, 21)), (1, 'SISTEMA DE TRANSPORTE P. Panam. PA', Decimal('1.00'), 1, Decimal('1.00'), datetime.datetime(2025, 12, 14, 19, 56, 50))]
+2025-12-14 15:23:07 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:23:08 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:23:53 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:23:54 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:24:39 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:24:40 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:25:25 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:25:26 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:25:26 [INFO] [GmailWatcher] [Ingridt.r.pinto@gmail.com] Detectados 1 correos nuevos.
+2025-12-14 15:25:26 [INFO] [GmailWatcher] [Ingridt.r.pinto@gmail.com] Compra: SEGUROS VIVIR SA ($40.0)
+2025-12-14 15:26:13 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:26:13 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:26:59 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:26:59 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:27:45 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:27:45 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:28:31 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:28:31 [INFO] [GmailWatcher] Login a correo existoso
+2025-12-14 15:29:17 [INFO] [GmailWatcher] Revisando buzón de: Ingridt.r.pinto@gmail.com
+2025-12-14 15:29:17 [INFO] [GmailWatcher] Login a correo existoso

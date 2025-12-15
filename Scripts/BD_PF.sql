@@ -6,9 +6,9 @@ IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'GlobalPointsWatcher')
 BEGIN
     CREATE DATABASE GlobalPointsWatcher
     ON PRIMARY 
-    ( NAME = N'GlobalPointsWatcher', FILENAME = N'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\GlobalPointsWatcher.mdf' , SIZE = 8192KB , MAXSIZE = UNLIMITED, FILEGROWTH = 65536KB )
+    ( NAME = N'GlobalPointsWatcher', FILENAME = N'C:\BDatos\Database\GlobalPointsWatcher.mdf' , SIZE = 8192KB , MAXSIZE = UNLIMITED, FILEGROWTH = 65536KB )
     LOG ON 
-    ( NAME = N'GlobalPointsWatcher_log', FILENAME = N'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\GlobalPointsWatcher_log.ldf' , SIZE = 8192KB , MAXSIZE = 2048GB , FILEGROWTH = 65536KB )
+    ( NAME = N'GlobalPointsWatcher_log', FILENAME = N'C:\BDatos\Database\GlobalPointsWatcher_log.ldf' , SIZE = 8192KB , MAXSIZE = 2048GB , FILEGROWTH = 65536KB )
 END
 GO
 
@@ -119,6 +119,7 @@ CREATE TABLE dbo.Transactions (
 	Multiplicador DECIMAL(4,2) NULL,
     TransactionAt DATETIME2(0)  NOT NULL,
     CreatedAt     DATETIME2(0)  NOT NULL DEFAULT SYSUTCDATETIME(),
+	CONSTRAINT CK_Transactions_MontoPositivo CHECK (AmountUSD >= 0),
     CONSTRAINT FK_Trans_Card FOREIGN KEY (UserCardId) REFERENCES dbo.UserCards(Id),
     CONSTRAINT FK_Trans_Comercio FOREIGN KEY (ComercioId) REFERENCES dbo.Comercio(Id)
 );
@@ -693,6 +694,19 @@ BEGIN
 END
 GO
 
+-- Login para Rol de SOLO LECTURA (Consultas)
+IF NOT EXISTS (SELECT name FROM sys.server_principals WHERE name = 'GlobalPointsReader')
+BEGIN
+    CREATE LOGIN GlobalPointsReader WITH PASSWORD = 'PasswordLecturaSegura!', CHECK_POLICY = ON;
+END
+
+-- Login para Rol ADMINISTRATIVO (Escritura y SPs)
+IF NOT EXISTS (SELECT name FROM sys.server_principals WHERE name = 'GlobalPointsAdmin')
+BEGIN
+    CREATE LOGIN GlobalPointsAdmin WITH PASSWORD = 'PasswordAdminSeguro!', CHECK_POLICY = ON;
+END
+GO
+
 USE GlobalPointsWatcher;
 GO
 
@@ -702,6 +716,18 @@ BEGIN
     CREATE USER [GlobalPointsAppUser] FOR LOGIN [GlobalPointsAppUser];
 END
 GO
+
+-- Usuario LECTOR
+IF NOT EXISTS (SELECT name FROM sys.database_principals WHERE name = 'GlobalPointsReader')
+BEGIN
+    CREATE USER GlobalPointsReader FOR LOGIN GlobalPointsReader;
+END
+
+-- Usuario ADMIN (para escritura y SPs)
+IF NOT EXISTS (SELECT name FROM sys.database_principals WHERE name = 'GlobalPointsAdmin')
+BEGIN
+    CREATE USER GlobalPointsAdmin FOR LOGIN GlobalPointsAdmin;
+END
 
 -- A) Permiso para EJECUTAR Stored Procedures en esquema dbo
 GRANT EXECUTE ON SCHEMA::dbo TO [GlobalPointsAppUser];
@@ -715,6 +741,19 @@ GRANT VIEW DEFINITION ON SYMMETRIC KEY::EmailCredsKey TO [GlobalPointsAppUser];
 GRANT CONTROL ON CERTIFICATE::EmailCredsCert TO [GlobalPointsAppUser]; 
 -- Nota: CONTROL sobre el certificado suele ser necesario para usarlo en desencriptación 
 GO
+
+-- PERMISOS PARA GLOBALPOINTSREADER (Solo Reportes)
+-- Este usuario solo debe poder leer datos y ejecutar SPs de reporte.
+GRANT SELECT ON SCHEMA::dbo TO GlobalPointsReader;
+GRANT EXECUTE ON OBJECT::dbo.sp_InsertTransactionFromEmail TO GlobalPointsReader;
+GRANT EXECUTE ON OBJECT::dbo.sp_MonthlyPointsSummary TO GlobalPointsReader;
+
+-- B. PERMISOS PARA GLOBALPOINTSADMIN (Escritura y Lógica)
+-- Este usuario necesita escribir, actualizar y ejecutar la lógica de negocio.
+GRANT EXECUTE ON SCHEMA::dbo TO GlobalPointsAdmin; -- Permite ejecutar TODOS los Stored Procedures
+GRANT INSERT, UPDATE, DELETE ON dbo.ErrorLog TO GlobalPointsAdmin;
+GRANT INSERT, UPDATE, DELETE ON dbo.AuditoriaValidaciones TO GlobalPointsAdmin;
+
 
 --- PRUEBAS DE FUNCIONABILIDAD ---
 PRINT '>>> INICIANDO PRUEBAS DE FUNCIONALIDAD (CRUD) <<<';
@@ -810,3 +849,65 @@ WHERE C.AppUserId = @UserId;
 REVERT;
 
 SELECT CURRENT_USER AS 'Usuario_Real_Restaurado';
+GO
+--- PRUEBAS DE INTEGRIDAD Y CONSISTENCIA DE DATOS ---
+DECLARE @UserCardId INT = (SELECT Id FROM dbo.UserCards WHERE CardLast4 = '4444');
+SELECT * FROM dbo.Comercio
+-- Ejecución
+DECLARE @TxId INT, @Action VARCHAR(20), @Msg NVARCHAR(MAX);
+EXEC  dbo.sp_InsertTransactionFromEmail
+    @AppUserId = @UserCardId, 
+    @RawComercioTexto = 'NUEVO_RESTAURANTE_TEST', -- Comercio que no existe
+    @CardLast4 = '4444', 
+    @BankName = 'Banco General', 
+    @AmountUSD = 30.50,
+    @TransactionId = @TxId OUTPUT, 
+    @BotAction = @Action OUTPUT, 
+    @MessageText = @Msg OUTPUT;
+
+-- Resultado (debe ser ASK_BOTH)
+SELECT @Action AS BotActionEsperada_ASK_BOTH, @Msg AS Mensaje;
+
+-- 1. Simular la configuración (el usuario elige x3 y categoría Comida)
+DECLARE @NuevoComercio NVARCHAR(100) = 'NUEVO_RESTAURANTE_TEST';
+EXEC dbo.sp_CompletarConfiguracion 
+    @TransactionId = @TxId, 
+    @SelectedMultiplier = 1.0, 
+    @SelectedCategoryName = 'Comida'; -- El SP debe crear la categoría si no existe.
+
+-- 2. Verificar que la regla se guardó en Merchants
+SELECT 
+    m.Name, 
+    c.Name AS CategoryName 
+FROM dbo.Comercio m
+INNER JOIN dbo.Categories c ON m.CategoryId = c.Id
+INNER JOIN dbo.ComercioReglaUsuario r on r.ComercioId = m.Id AND r.UserCardId = @UserCardId
+WHERE m.Name = @NuevoComercio;
+
+-- Verifica las transacciones
+SELECT AmountUSD, Points, t.Multiplicador, r.Multiplicador 
+FROM dbo.Transactions t
+JOIN ComercioReglaUsuario r on t.ComercioId = r.ComercioId
+WHERE t.UserCardId = @UserCardId;
+
+PRINT 'Datos de prueba insertados para Resumen Mensual.';
+-- Ejecutamos el resumen (sin pasar mes/año, usa el actual)
+EXEC dbo.sp_MonthlyPointsSummary @TelegramChatId = 999888777;
+--2. VALORES ERRONEOS
+
+PRINT 'Intentando insertar transacción con monto negativo (-5.00)...';
+BEGIN TRY
+    INSERT INTO dbo.Transactions (UserCardId, AmountUSD, Multiplicador, Points, TransactionAt)
+    VALUES (@UserCardId, -5.00, 1.0, 0, GETDATE());
+    PRINT 'El monto negativo fue insertado';
+END TRY
+BEGIN CATCH
+    -- Resultado esperado
+    PRINT 'Error al insertar el monto negativo';
+    PRINT ERROR_MESSAGE();
+END CATCH
+
+SELECT AmountUSD, Points, t.Multiplicador, r.Multiplicador 
+FROM dbo.Transactions t
+JOIN ComercioReglaUsuario r on t.ComercioId = r.ComercioId
+WHERE t.UserCardId = @UserCardId;

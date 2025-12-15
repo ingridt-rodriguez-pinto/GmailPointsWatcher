@@ -781,3 +781,122 @@ SELECT AmountUSD, Points, t.Multiplicador, r.Multiplicador
 FROM dbo.Transactions t
 JOIN ComercioReglaUsuario r on t.ComercioId = r.ComercioId
 WHERE t.UserCardId = @UserCardId;
+
+--- JOB BACKUP DIARIO ---
+USE GlobalPointsWatcher
+GO
+CREATE OR ALTER PROCEDURE [dbo].[sp_BackupDatabase_Diario]
+AS
+BEGIN
+	SET NOCOUNT ON;
+
+	DECLARE @DbName NVARCHAR(50) = DB_NAME(); 
+	DECLARE @Path NVARCHAR(255) = 'C:\BDatos\Backup';
+	DECLARE @FileName NVARCHAR(255);
+	DECLARE @DateStamp NVARCHAR(20);
+
+	-- Generar formato fecha: yyyyMMdd_HHmm
+	SELECT @DateStamp = FORMAT(GETDATE(), 'yyyyMMdd_HHmm');
+
+	-- Construir nombre del archivo: NombreDB_Fecha.bak
+	SET @FileName = @Path + @DbName + '_' + @DateStamp + '.bak';
+
+	BEGIN TRY
+		BACKUP DATABASE @DbName 
+		TO DISK = @FileName 
+		WITH FORMAT, 
+			 MEDIANAME = 'SQLServerBackups', 
+			 NAME = 'Full Backup Diario',
+			 COMPRESSION; 
+		
+		PRINT 'Backup completado exitosamente.';
+	END TRY
+	BEGIN CATCH
+		PRINT 'Error al realizar el backup: ' + ERROR_MESSAGE();
+	END CATCH
+END
+GO
+
+
+USE [msdb];
+GO
+
+DECLARE @JobName NVARCHAR(100) = 'Backup_Semanal_Domingo';
+
+IF EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = @JobName)
+BEGIN
+    EXEC msdb.dbo.sp_delete_job @job_name = @JobName, @delete_unused_schedule = 1;
+END
+
+-- Crear el Job Principal
+BEGIN TRANSACTION
+DECLARE @ReturnCode INT;
+SELECT @ReturnCode = 0;
+
+DECLARE @jobId BINARY(16);
+EXEC @ReturnCode =  msdb.dbo.sp_add_job 
+        @job_name = @JobName, 
+        @enabled = 1, 
+        @notify_level_eventlog = 0, 
+        @notify_level_email = 0, 
+        @notify_level_netsend = 0, 
+        @notify_level_page = 0, 
+        @delete_level = 0, 
+        @description = N'Respaldo automático completo ejecutado cada domingo.', 
+        @category_name = N'[Uncategorized (Local)]', 
+        @owner_login_name = N'sa', 
+        @job_id = @jobId OUTPUT;
+
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback;
+
+-- 3. Crear el Paso del Job (Step) que ejecuta el Store Procedure
+EXEC @ReturnCode = msdb.dbo.sp_add_jobstep 
+        @job_id = @jobId, 
+        @step_name = N'Ejecutar SP Backup', 
+        @step_id = 1, 
+        @cmdexec_success_code = 0, 
+        @on_success_action = 1, 
+        @on_success_step_id = 0, 
+        @on_fail_action = 2, 
+        @on_fail_step_id = 0, 
+        @retry_attempts = 0, 
+        @retry_interval = 0, 
+        @os_run_priority = 0, 
+        @subsystem = N'TSQL', 
+        -- AQUÍ CAMBIA [TuBaseDeDatos] POR EL NOMBRE REAL
+        @command = N'EXEC [GlobalPointsWatcher].[dbo].[sp_BackupDatabase_Diario]', 
+        @database_name = N'GlobalPointsWatcher', 
+        @flags = 0;
+
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback;
+
+-- 4. Crear el Horario (Schedule): Semanal, Domingos a las 2:00 AM
+EXEC @ReturnCode = msdb.dbo.sp_add_jobschedule 
+        @job_id = @jobId, 
+        @name = N'HorarioDomingoMadrugada', 
+        @enabled = 1, 
+        @freq_type = 8,        -- 8 = Semanal
+        @freq_interval = 1,    -- 1 = Domingo (Sunday)
+        @freq_subday_type = 1, 
+        @freq_subday_interval = 0, 
+        @freq_relative_interval = 0, 
+        @freq_recurrence_factor = 1, 
+        @active_start_date = 20231201, 
+        @active_end_date = 99991231, 
+        @active_start_time = 020000, -- 02:00:00 AM
+        @active_end_time = 235959;
+
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback;
+
+-- 5. Asignar el Job al Servidor Local
+EXEC @ReturnCode = msdb.dbo.sp_add_jobserver @job_id = @jobId, @server_name = N'(local)';
+
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback;
+
+COMMIT TRANSACTION;
+GOTO EndSave;
+
+QuitWithRollback:
+    IF (@@TRANCOUNT > 0) ROLLBACK TRANSACTION;
+EndSave:
+GO
